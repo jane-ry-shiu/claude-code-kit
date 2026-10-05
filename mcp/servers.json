@@ -8,8 +8,7 @@
   "chrome-devtools": {
     "command": "npx",
     "args": [
-      "-y",
-      "chrome-devtools-mcp@0.23.0"
+      "chrome-devtools-mcp@latest"
     ]
   }
 }
