@@ -1,0 +1,15 @@
+{
+  "_comment": "MCP servers registered by `install.sh --mcp`. No secret lives here: stdio servers start through bin/kit-env, which reads credentials from the Keychain at launch; GitHub gets its header from bin/kit-github-headers. __KIT_BIN__ and __HOME__ are filled in at install time.",
+  "github": {
+    "type": "http",
+    "url": "https://api.githubcopilot.com/mcp",
+    "headersHelper": "__KIT_BIN__/kit-github-headers"
+  },
+  "chrome-devtools": {
+    "command": "npx",
+    "args": [
+      "-y",
+      "chrome-devtools-mcp@0.23.0"
+    ]
+  }
+}

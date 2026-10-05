@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Run a command with the kit's credentials in its environment.
+#
+# MCP servers are registered as `kit-env <real command...>`, so their config
+# holds no secret: the values are read from the Keychain (or the caller's
+# environment) at launch and exist only in the server's process.
+#
+# Usage: kit-env <command> [args...]
+
+set -euo pipefail
+[[ $# -gt 0 ]] || { echo "usage: kit-env <command> [args...]" >&2; exit 64; }
+
+KIT_BIN="$(cd "$(dirname "$0")" && pwd)"
+eval "$("$KIT_BIN/kit-secret" env)"
+exec "$@"

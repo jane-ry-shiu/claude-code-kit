@@ -1,0 +1,8 @@
+# file :: required heading :: required heading ...
+references/baseline-discovery.md :: ## Locating the Jira key :: ## Where to look inside Jira :: ## Stop condition
+references/plan-and-report.md :: ## Plan file location :: ## Per-item lifecycle :: ## Pending comment backup :: ## Final counts
+references/browser-operation.md :: ## Lane assignment :: ## Approach hierarchy :: ## Snapshot usage :: ## State inspection :: ## Side-effect verification :: ## Retry policy
+references/dev-server.md :: ## Protocol :: ## Cleanup :: ## Error cases
+references/visual-comparison.md :: ## Prerequisites :: ## Process :: ## Limitations
+references/prototype-comparison.md :: ## When this applies :: ## Login conflict check :: ## Paired action execution :: ## What counts as a difference
+references/reconcile-findings.md :: ## Confirmation gate :: ## Backup first :: ## Four dispositions :: ## Landing sites :: ## Situations without a pending review :: ## Never submit

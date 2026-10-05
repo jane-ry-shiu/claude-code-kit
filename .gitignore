@@ -1,0 +1,13 @@
+# Secrets and per-machine state never belong in this repo.
+skills/teams-notify/references/targets.json
+*.local.json
+.env
+.env.*
+
+# Caches and tool scratch space
+.DS_Store
+__pycache__/
+*.pyc
+.pytest_cache/
+node_modules/
+.superpowers/

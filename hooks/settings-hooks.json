@@ -1,0 +1,17 @@
+{
+  "PreToolUse": [
+    {
+      "matcher": "Bash",
+      "hooks": [
+        { "type": "command", "command": "~/.claude/hooks/intercept-pr-comment.sh \"$TOOL_INPUT\"" }
+      ]
+    }
+  ],
+  "Stop": [
+    {
+      "hooks": [
+        { "type": "command", "command": "~/.claude/hooks/review-done-notify.py", "timeout": 30, "async": true }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# headersHelper for the GitHub MCP server: prints the Authorization header as
+# JSON on stdout, which Claude Code merges into the connection headers.
+#
+# Token source, first match wins: GITHUB_PAT (env or Keychain via kit-secret),
+# then the GitHub CLI's own login (`gh auth token`).
+
+set -euo pipefail
+
+KIT_BIN="$(cd "$(dirname "$0")" && pwd)"
+token="$("$KIT_BIN/kit-secret" get GITHUB_PAT 2>/dev/null || true)"
+if [[ -z "$token" ]] && command -v gh >/dev/null 2>&1; then
+  token="$(gh auth token 2>/dev/null || true)"
+fi
+[[ -n "$token" ]] || { echo "kit-github-headers: no GITHUB_PAT and no gh login" >&2; exit 1; }
+
+printf '{"Authorization": "Bearer %s"}\n' "$token"
