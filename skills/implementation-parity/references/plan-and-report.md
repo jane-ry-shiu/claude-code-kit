@@ -203,7 +203,7 @@ commit_id: <the commit the position was computed against>
 `position` and `commit_id` are in this block because of a measured API behavior, not for
 completeness: while a review is still pending, GitHub returns `line`, `side`, `start_line` and
 `subject_type` as `null` and carries the anchor only in `position` / `original_position` (verified
-against a live PR — see `docs/specs/2026-08-20-pending-comment-api-findings.md`). Re-adding a
+against a live PR). Re-adding a
 comment, however, takes a **line**, not a position. A backup recording only `line` would therefore
 read as complete and be unreplayable — restoring includes converting the recorded `position` back
 to a line against `commit_id`'s patch hunks.

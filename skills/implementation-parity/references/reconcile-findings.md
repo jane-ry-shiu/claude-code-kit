@@ -134,7 +134,7 @@ the field names here.
 What the GitHub MCP surface exposes for reviews is `create`, `submit_pending`, `delete_pending`,
 `resolve_thread`, `unresolve_thread`, and `add_comment_to_pending_review`. It has **no** per-comment
 delete or edit. Raw REST does have a per-comment delete, and does not have a working edit — both
-verified against a live PR, recorded in `docs/specs/2026-08-20-pending-comment-api-findings.md`.
+verified against a live PR.
 
 Primary path — per comment, no rebuild:
 
