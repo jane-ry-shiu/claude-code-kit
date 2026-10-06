@@ -3,7 +3,7 @@
     {
       "matcher": "Bash",
       "hooks": [
-        { "type": "command", "command": "~/.claude/hooks/intercept-pr-comment.sh \"$TOOL_INPUT\"" }
+        { "type": "command", "command": "~/.claude/hooks/intercept-pr-comment.sh" }
       ]
     }
   ],
