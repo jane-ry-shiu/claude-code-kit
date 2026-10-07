@@ -59,6 +59,20 @@ function readSize(src, where) {
   }
 }
 
+const isRect = (r) => Array.isArray(r) && r.length === 4 && r.every(Number.isFinite);
+const contains = ([ox, oy, ow, oh], [x, y, w, h]) => x >= ox && y >= oy && x + w <= ox + ow && y + h <= oy + oh;
+
+/** crop is optional; when given it must sit inside the screenshot and hold every mark. */
+function cropProblems(crop, where, css, marks) {
+  if (crop === undefined) return [];
+  const full = [0, 0, css.width, css.height];
+  if (!isRect(crop) || crop[2] <= 0 || crop[3] <= 0 || !contains(full, crop)) {
+    return [`${where}: crop ${JSON.stringify(crop)} must be [x, y, width, height] inside the ${css.width}×${css.height} screenshot`];
+  }
+  return marks.flatMap((m, i) => (isRect(m.rect) && !contains(crop, m.rect)
+    ? [`${where}.marks[${i}]: rect ${JSON.stringify(m.rect)} falls outside the crop ${JSON.stringify(crop)}`] : []));
+}
+
 function checkCell(cell, where, meanings, baseDir) {
   if (cell?.unreachable !== undefined) return unreachableCell(cell, where);
   if (!cell?.src) return { problems: [`${where}: src is required (or unreachable with a reason)`], cell: null };
@@ -73,8 +87,10 @@ function checkCell(cell, where, meanings, baseDir) {
     ...(cell.verdict === undefined || VERDICTS[cell.verdict] ? [] : [`${where}: verdict must be pass or fail`]),
     ...marks.flatMap((m, i) => markProblems(m, `${where}.marks[${i}]`, css, meanings)),
     ...duplicateNumberProblems(marks, where),
+    ...cropProblems(cell.crop, where, css, marks),
   ];
-  return { problems, cell: { src, css, verdict: cell.verdict, marks } };
+  const view = cell.crop ?? [0, 0, css.width, css.height];
+  return { problems, cell: { src, css, pixelRatio, view, verdict: cell.verdict, marks } };
 }
 
 /** A number with notes in several cells must be told apart by a row label or column heading in each. */

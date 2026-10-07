@@ -67,6 +67,16 @@ test('a number repeated across cells that nothing tells apart is an error', () =
   assert.deepEqual(problemsOf({ ...spec, rowLabels: ['畫面一', '畫面二'] }), []);
 });
 
+test('crop must lie inside the screenshot', () => {
+  assert.match(problemsOf(base([[{ src: png, crop: [150, 0, 100, 50] }]])).join('\n'), /rows\[0\]\[0\]: crop \[150,0,100,50\] must be \[x, y, width, height\] inside the 200×100 screenshot/);
+  assert.deepEqual(problemsOf(base([[{ src: png, crop: [100, 0, 100, 50] }]])), []);
+});
+
+test('a mark outside the crop is an error, not a box that silently disappears', () => {
+  const cell = { src: png, crop: [0, 0, 100, 50], marks: [{ rect: [90, 10, 20, 10], meaning: 'focus' }] };
+  assert.match(problemsOf(base([[cell]])).join('\n'), /rows\[0\]\[0\]\.marks\[0\]: rect \[90,10,20,10\] falls outside the crop \[0,0,100,50\]/);
+});
+
 test('a non-PNG source is an error', () => {
   const fake = join(dir, 'fake.png');
   writeFileSync(fake, 'text');

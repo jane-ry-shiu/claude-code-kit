@@ -20,6 +20,7 @@ width. Paths in `src` may be relative to the spec file.
 | `pixelRatio` | cell | Device scale of the screenshot (2 for live captures; 1 when rects were read off the image) |
 | `verdict` | cell | `pass` / `fail` — frame colour and ✓ / ✗ strip |
 | `unreachable` | cell | Reason, instead of `src`, for a condition that cannot exist |
+| `crop` | cell | `[x, y, width, height]` in the screenshot's CSS px. The cell shows only this part, enlarged to the cell width but never past the screenshot's own pixels. Marks keep full-screenshot coordinates and must sit inside the crop |
 | `marks[].rect` | mark | `[x, y, width, height]` in the screenshot's CSS px |
 | `marks[].meaning` | mark | `pass`, `fail`, `focus`, `step`, or a key from `meanings` |
 | `marks[].n` | mark | Badge label; unique within a cell |
@@ -39,9 +40,9 @@ width. Paths in `src` may be relative to the spec file.
   "numbersRefer": "編號對應驗證清單項目",
   "rows": [
     [
-      { "src": "tip10-dark.png", "verdict": "pass", "marks": [{ "rect": [320, 130, 345, 50], "meaning": "focus", "n": "#10" }] },
-      { "src": "tip10-light.png", "verdict": "pass", "marks": [{ "rect": [320, 130, 345, 50], "meaning": "focus", "n": "#10" }] },
-      { "src": "tip10-long.png", "verdict": "pass" }
+      { "src": "tip10-dark.png", "verdict": "pass", "crop": [240, 90, 520, 130], "marks": [{ "rect": [320, 130, 345, 50], "meaning": "focus", "n": "#10" }] },
+      { "src": "tip10-light.png", "verdict": "pass", "crop": [240, 90, 520, 130], "marks": [{ "rect": [320, 130, 345, 50], "meaning": "focus", "n": "#10" }] },
+      { "src": "tip10-long.png", "verdict": "pass", "crop": [240, 90, 520, 130] }
     ],
     [
       { "src": "tip11-dark.png", "verdict": "pass" },
@@ -57,7 +58,9 @@ width. Paths in `src` may be relative to the spec file.
 }
 ```
 
-Numbers are the checklist's own (`#10`); never renumber them. Every cell has a verdict.
+Numbers are the checklist's own (`#10`); never renumber them. Every cell has a verdict. Row #10
+is cropped to the tooltip and its surroundings, the same crop in every column, so the tooltip shows
+at its real size and the three cells compare position for position.
 
 ## pair — PR before / after
 

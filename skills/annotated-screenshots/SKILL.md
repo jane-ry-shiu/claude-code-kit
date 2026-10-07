@@ -83,6 +83,9 @@ Colour means one thing everywhere. The scripts enforce the table.
 - Badges are small (18 px) and sit outside their box; boxes sit 3 px outside the element; nothing is
   drawn inside a box.
 - No sentences on the screenshot. Notes go in the list under the image and in the companion text.
+- When the point is a small part of a large screenshot (a tooltip, a label), give each cell a
+  `crop` around it with a little surrounding context, so it shows near its real size. Use the same
+  crop across a row unless one cell's subject is larger; marks keep full-screenshot coordinates.
 - Every sheet has a title (what it shows) and a subtitle (how to read it). All text on the image —
   title, subtitle, headings, notes, legend — is 繁體中文, with product names exactly as the English UI
   shows them and ticket keys in full.

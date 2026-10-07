@@ -49,6 +49,25 @@ test('pixelRatio 2: boxes land on the measured element at the displayed scale', 
   assert.match(renderSheetHtml(sheet), /class="box" style="left:97px;top:47px;width:46px;height:26px/);
 });
 
+test('crop shows only that part, at most at the screenshot\'s own resolution, with marks moved into it', () => {
+  const sheet = sheetOf({ columns: ['A'], rows: [[{ src: png, crop: [100, 50, 200, 100], marks: [{ rect: [150, 70, 20, 10], meaning: 'focus' }] }]] });
+  const html = renderSheetHtml(sheet);
+  assert.match(html, /class="pic" style="width:200px;height:100px/);
+  assert.match(html, /<img [^>]*style="left:-100px;top:-50px;width:400px;height:200px"/);
+  assert.match(html, /class="box" style="left:47px;top:17px;width:26px;height:16px/);
+});
+
+test('a crop of a device-scale-2 screenshot is enlarged to the cell width', () => {
+  const big = makePng(join(dir, 'big2.png'), 1040, 600);
+  const sheet = sheetOf({ columns: ['A'], rows: [[{ src: big, pixelRatio: 2, crop: [100, 50, 260, 100] }]] });
+  assert.match(renderSheetHtml(sheet), /class="pic" style="width:520px;height:200px/);
+});
+
+test('an uncropped screenshot narrower than the cell is not enlarged', () => {
+  const sheet = sheetOf({ columns: ['A'], rows: [[{ src: png }]] });
+  assert.match(renderSheetHtml(sheet), /class="pic" style="width:400px;height:200px/);
+});
+
 test('a #10 badge is wider than a single-digit one', () => {
   const sheet = sheetOf({ columns: ['A'], rows: [[{ src: png, marks: [{ rect: [100, 100, 50, 20], meaning: 'focus', n: '#10' }] }]] });
   assert.match(renderSheetHtml(sheet), /class="badge" style="[^"]*width:29px/);

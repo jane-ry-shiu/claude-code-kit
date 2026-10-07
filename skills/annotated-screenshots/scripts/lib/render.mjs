@@ -49,8 +49,8 @@ h1{font-size:22px;margin:0 0 6px}
 .colhead{font-size:15px;font-weight:600}
 .rowhead{font-size:20px;font-weight:700;padding-top:4px}
 .cell{margin:0}
-.pic{position:relative;outline:3px solid var(--frame);outline-offset:2px}
-.pic img{display:block}
+.pic{position:relative;overflow:hidden;outline:3px solid var(--frame);outline-offset:2px}
+.pic img{position:absolute;max-width:none}
 .box{position:absolute;box-sizing:border-box;border:${BOX_BORDER}px solid var(--c);border-radius:3px;box-shadow:0 0 0 1px rgba(255,255,255,.85)}
 .badge,.chip{box-sizing:border-box;height:${BADGE_HEIGHT}px;border-radius:${BADGE_HEIGHT / 2}px;background:var(--c);color:#fff;font:700 11px/${BADGE_HEIGHT}px -apple-system,sans-serif;text-align:center}
 .badge{position:absolute;box-shadow:0 0 0 1px #fff}
@@ -82,14 +82,18 @@ function renderCell(cell, sheet) {
     const color = sheet.meanings.unreachable.color;
     return `<div class="na" style="--c:${color}">${escapeHtml(labelFor(sheet, 'unreachable'))}：${escapeHtml(cell.unreachable)}</div>`;
   }
-  const W = sheet.cellWidth;
-  const scale = W / cell.css.width;
-  const H = Math.round(cell.css.height * scale);
+  // Show the crop (or the whole shot) at the cell width, never enlarged past the screenshot's own pixels.
+  const [vx, vy, vw, vh] = cell.view;
+  const W = Math.min(sheet.cellWidth, vw * cell.pixelRatio);
+  const scale = W / vw;
+  const H = Math.round(vh * scale);
   const frame = cell.verdict ? sheet.meanings[cell.verdict].color : 'transparent';
   const strip = cell.verdict
     ? `<div class="verdict" style="--c:${frame}">${VERDICTS[cell.verdict]} ${escapeHtml(labelFor(sheet, cell.verdict))}</div>` : '';
-  const img = `<img src="${pathToFileURL(cell.src).href}" width="${W}" height="${H}" alt="">`;
-  return `<figure class="cell"><div class="pic" style="width:${W}px;height:${H}px;--frame:${frame}">${img}${renderMarks(cell, sheet, scale, W, H)}</div>${strip}</figure>`;
+  const imgStyle = `left:${-vx * scale}px;top:${-vy * scale}px;width:${cell.css.width * scale}px;height:${cell.css.height * scale}px`;
+  const img = `<img src="${pathToFileURL(cell.src).href}" style="${imgStyle}" alt="">`;
+  const inView = { ...cell, marks: cell.marks.map((m) => ({ ...m, rect: [m.rect[0] - vx, m.rect[1] - vy, m.rect[2], m.rect[3]] })) };
+  return `<figure class="cell"><div class="pic" style="width:${W}px;height:${H}px;--frame:${frame}">${img}${renderMarks(inView, sheet, scale, W, H)}</div>${strip}</figure>`;
 }
 
 function renderGrid(sheet) {
