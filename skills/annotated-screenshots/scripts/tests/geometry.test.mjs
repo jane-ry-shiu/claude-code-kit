@@ -53,6 +53,18 @@ test('placeBadges honours a pinned corner', () => {
   assert.equal(b.corner, 'br');
 });
 
+test('a pinned corner at the image edge is moved back inside the image', () => {
+  const [b] = placeBadges([{ x: 490, y: 5, w: 25, h: 22, label: '#10', badge: 'tr' }], 520, 300);
+  assert.equal(b.corner, 'tr');
+  assert.ok(b.x >= 0 && b.y >= 0 && b.x + b.w <= 520 && b.y + b.h <= 300, JSON.stringify(b));
+});
+
+test('maxRectDrift accepts two measure results directly', () => {
+  const first = { targets: [{ selector: '#a', rect: [0, 0, 10, 10] }] };
+  const second = { targets: [{ selector: '#a', rect: [0, 3, 10, 10] }] };
+  assert.equal(maxRectDrift(first, second), 3);
+});
+
 test('maxRectDrift reports the largest coordinate change', () => {
   assert.equal(maxRectDrift([[0, 0, 10, 10]], [[1, 0, 10, 12]]), 2);
   assert.equal(maxRectDrift([[0, 0, 10, 10]], []), Infinity);

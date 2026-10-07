@@ -55,6 +55,18 @@ test('duplicate number: two marks numbered 1 in one cell are rejected, naming th
   assert.match(problemsOf(base([[{ src: png, marks }]])).join('\n'), /rows\[0\]\[0\]: number 1 appears more than once/);
 });
 
+test('a note without a number is an error, not silently dropped', () => {
+  const marks = [{ rect: [10, 10, 50, 20], meaning: 'fail', note: '這裡被切掉' }];
+  assert.match(problemsOf(base([[{ src: png, marks }]])).join('\n'), /rows\[0\]\[0\]\.marks\[0\]: a note needs a number n/);
+});
+
+test('a number repeated across cells that nothing tells apart is an error', () => {
+  const cell = (note) => ({ src: png, marks: [{ rect: [0, 0, 5, 5], meaning: 'step', n: 1, note }] });
+  const spec = { title: 'T', subtitle: 'S', layout: 'steps', columns: [''], rows: [[cell('第一個畫面')], [cell('第二個畫面')]] };
+  assert.match(problemsOf(spec).join('\n'), /number 1 is used in rows\[0\]\[0\] and rows\[1\]\[0\] but no row label or column heading tells them apart/);
+  assert.deepEqual(problemsOf({ ...spec, rowLabels: ['畫面一', '畫面二'] }), []);
+});
+
 test('a non-PNG source is an error', () => {
   const fake = join(dir, 'fake.png');
   writeFileSync(fake, 'text');

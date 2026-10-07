@@ -25,6 +25,8 @@ function badgeAt(box, corner, w) {
   return { x, y, w, h: BADGE_HEIGHT };
 }
 
+const keepInside = (r, W, H) => ({ ...r, x: clamp(r.x, 0, W - r.w), y: clamp(r.y, 0, H - r.h) });
+
 function straddle(box, w, W, H) {
   const x = clamp(box.x - w / 2, 0, W - w);
   const y = clamp(box.y - BADGE_HEIGHT / 2, 0, H - BADGE_HEIGHT);
@@ -44,13 +46,18 @@ export function placeBadges(boxes, W, H) {
       && !others.some((b) => intersects(r, b))
       && !placed.some((p) => p && intersects(r, p));
     const corner = box.badge ?? CORNERS.find((c) => free(badgeAt(box, c, w)));
-    const rect = corner ? badgeAt(box, corner, w) : straddle(box, w, W, H);
+    // A pinned corner skips the free check but must still stay inside the image.
+    const rect = corner ? keepInside(badgeAt(box, corner, w), W, H) : straddle(box, w, W, H);
     return [...placed, { ...rect, corner: corner ?? 'straddle' }];
   }, []);
 }
 
-/** Largest coordinate change between two measurements of the same targets. */
-export function maxRectDrift(before, after) {
+const rectsOf = (m) => (Array.isArray(m) ? m : m.targets.map((t) => t.rect));
+
+/** Largest coordinate change between two measurements (measure results or rect lists) of the same targets. */
+export function maxRectDrift(first, second) {
+  const before = rectsOf(first);
+  const after = rectsOf(second);
   if (before.length !== after.length) return Infinity;
   return Math.max(0, ...before.flatMap((r, i) => r.map((v, k) => Math.abs(v - after[i][k]))));
 }

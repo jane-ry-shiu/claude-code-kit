@@ -32,6 +32,7 @@ function markProblems(mark, at, css, meanings) {
     ...(outside ? [`${at}: rect ${JSON.stringify(mark.rect)} falls outside the ${css.width}×${css.height} screenshot`] : []),
     ...(meanings[mark?.meaning] ? [] : [`${at}: unknown meaning "${mark?.meaning}"`]),
     ...(mark?.badge === undefined || CORNERS.includes(mark.badge) ? [] : [`${at}: badge must be one of ${CORNERS.join(', ')}`]),
+    ...(mark?.note && mark.n === undefined ? [`${at}: a note needs a number n — the notes list is keyed by number`] : []),
   ];
 }
 
@@ -76,6 +77,20 @@ function checkCell(cell, where, meanings, baseDir) {
   return { problems, cell: { src, css, verdict: cell.verdict, marks } };
 }
 
+/** A number with notes in several cells must be told apart by a row label or column heading in each. */
+function repeatedNumberProblems(cells, columns, rowLabels) {
+  const uses = cells.flatMap((row, r) => row.flatMap((cell, c) => (cell?.marks ?? [])
+    .filter((m) => m.n !== undefined && m.note)
+    .map((m) => ({ n: m.n, where: `rows[${r}][${c}]`, context: [rowLabels?.[r], columns[c]].filter(Boolean).join('・') }))));
+  return [...new Set(uses.map((u) => u.n))].flatMap((n) => {
+    const group = uses.filter((u) => u.n === n);
+    const places = [...new Set(group.map((u) => u.where))];
+    const contexts = new Set(group.map((u) => u.context));
+    const ambiguous = places.length > 1 && (contexts.has('') || contexts.size < places.length);
+    return ambiguous ? [`number ${n} is used in ${places.join(' and ')} but no row label or column heading tells them apart`] : [];
+  });
+}
+
 function topLevelProblems(spec, layout, columns, rows) {
   return [
     ...(spec?.title ? [] : ['title is required']),
@@ -103,7 +118,9 @@ export function normalizeSpec(spec, { baseDir = process.cwd() } = {}) {
     ...customMeaningProblems(custom),
     ...checked.flatMap((row, r) => (row ? row.flatMap((c) => c.problems) : [`rows[${r}] must have ${columns.length} cells`])),
   ];
-  if (problems.length) throw new SpecError(problems);
+  const cells = checked.map((row) => (row ?? []).map((c) => c.cell));
+  const allProblems = [...problems, ...repeatedNumberProblems(cells, columns, spec?.rowLabels)];
+  if (allProblems.length) throw new SpecError(allProblems);
   return Object.freeze({
     title: String(spec.title),
     subtitle: String(spec.subtitle),
@@ -114,6 +131,6 @@ export function normalizeSpec(spec, { baseDir = process.cwd() } = {}) {
     meanings,
     legend: spec.legend ?? {},
     numbersRefer: spec.numbersRefer ?? null,
-    rows: checked.map((row) => row.map((c) => c.cell)),
+    rows: cells,
   });
 }

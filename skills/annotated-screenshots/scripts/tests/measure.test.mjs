@@ -9,6 +9,8 @@ const skip = playwright ? false : 'Playwright not found: set PLAYWRIGHT_FROM';
 const PAGE = `<body style="margin:0">
   <div id="region" style="position:absolute;left:50px;top:40px;width:300px;height:200px">
     <button id="a" style="position:absolute;left:10px;top:20px;width:80px;height:30px">A</button>
+    <button class="twin" style="position:absolute;left:10px;top:100px;width:40px;height:20px">T1</button>
+    <button class="twin" style="position:absolute;left:60px;top:100px;width:40px;height:20px">T2</button>
   </div></body>`;
 
 async function withPage(fn) {
@@ -35,6 +37,10 @@ test('rects are relative to the region, in CSS px, and keep the target fields', 
 test('region null measures against the viewport', { skip }, async () => {
   const result = await withPage((page) => page.evaluate(measureExpression({ region: null, targets: [{ selector: '#a', meaning: 'focus' }] })));
   assert.deepEqual(result.targets[0].rect, [60, 60, 80, 30]);
+});
+
+test('a selector matching several elements is an error, not the first match', { skip }, async () => {
+  await assert.rejects(withPage((page) => page.evaluate(measureExpression({ region: '#region', targets: [{ selector: '.twin', meaning: 'focus' }] }))), /target matches 2 elements: \.twin/);
 });
 
 test('a missing target is an error, not a silent skip', { skip }, async () => {
