@@ -9,13 +9,15 @@
 //   CORS_SHIM=<page origin>|<origin the API allows>   e.g. "http://localhost:8091|http://localhost:8080" (optional):
 //              re-issues API requests from that page with the allowed Origin and answers CORS for the page origin
 //
-// Helpers on `h`: front, hover, ensureGrab, hideBar, grab, csnap, grabFromWindow, nativeWins, sleep, run, pid, log.
+// Helpers on `h`: front, hover, ensureGrab, hideBar, grab, csnap, grabFromWindow, nativeWins, sleep, run, pid, log;
+// recording and real clicks (record.mjs): click, glide, key, mark, recStart, recStop.
 import { createRequire } from 'module';
 import http from 'http';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { execFileSync } from 'child_process';
+import { installRecording } from './record.mjs';
 
 const env = process.env;
 if (!env.PLAYWRIGHT_CORE) throw new Error('set PLAYWRIGHT_CORE to a directory whose node_modules has playwright-core');
@@ -63,7 +65,8 @@ if (env.WRITE_GUARD) {
   });
 }
 
-const page = context.pages()[0] || await context.newPage();
+// Skip the recorder tab (record.mjs) left open by an earlier harness run.
+const page = context.pages().find((p) => !/^http:\/\/127\.0\.0\.1:\d+\/rec/.test(p.url())) || await context.newPage();
 const run = (bin, args) => { try { return execFileSync(path.join(OSBIN, bin), args).toString().trim(); } catch (e) { return `ERR ${e.status} ${String(e.stdout || '')}`.trim(); } };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const pid = () => execFileSync('/usr/sbin/lsof', [`-tiTCP:${CDP}`, '-sTCP:LISTEN']).toString().trim().split('\n')[0];
@@ -188,7 +191,10 @@ h.grabFromWindow = async (url, bounds) => {
   return gp;
 };
 
+const recordingRoutes = installRecording(h, { context, env, OUT, run, sleep, log });
+
 http.createServer(async (req, res) => {
+  try { if (await recordingRoutes(req, res)) return; } catch (e) { res.statusCode = 500; res.end(String(e.stack || e)); return; }
   let src = ''; for await (const c of req) src += c;
   try {
     const fn = eval(`(${src})`);

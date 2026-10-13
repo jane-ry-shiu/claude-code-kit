@@ -1,6 +1,6 @@
 ---
 name: os-screen-capture
-description: Use when a screenshot must show something the operating system draws rather than the web page — the mouse cursor shape (arrow, hand, not-allowed, I-beam), a native `title` tooltip, a native select popup or other OS-drawn UI — for a Jira comment, PR or record, including when a page screenshot came out without the cursor or tooltip the reader needs to see.
+description: Use when a screenshot must show something the operating system draws rather than the web page — the mouse cursor shape (arrow, hand, not-allowed, I-beam), a native `title` tooltip, a native select popup or other OS-drawn UI — for a Jira comment, PR or record, including when a page screenshot came out without the cursor or tooltip the reader needs to see. Also use when the evidence must be a screen recording — a sequence of real clicks and key presses (open, Cancel, click outside, Esc) whose correctness only shows over time, or a video reproducing an issue.
 ---
 
 # OS Screen Capture
@@ -18,6 +18,7 @@ only in a **real screen capture of a visible browser under a real mouse hover**.
 |---|---|
 | Page content, page-drawn tooltips/popovers (reka, tippy, `role="tooltip"`) | Normal page screenshot (capture-page-screenshots, Playwright) |
 | Cursor shape, native `title` tooltip, native `<select>` popup, other OS-drawn UI | **This skill** |
+| A sequence over time — where the pointer went, what was clicked or pressed, what the page did next; reproducing an issue | **This skill, recording** (`h.recStart` … `h.recStop`) |
 | Only the cursor *value*, no image | `getComputedStyle(elementFromPoint(x, y)).cursor` — but `auto` over text is the I-beam; only `default` is the arrow |
 
 ## Before the run
@@ -32,8 +33,8 @@ only in a **real screen capture of a visible browser under a real mouse hover**.
 
 ## Run
 
-1. `bash scripts/build-os-tools.sh` — compiles the Swift helpers (`warp`, `activate`, `allwin`, `axpress`, `axdump`,
-   `screens`) into `~/.cache/os-screen-capture/bin`. Once per machine; rerun if the binaries are gone.
+1. `bash scripts/build-os-tools.sh` — compiles the Swift helpers (`warp`, `click`, `activate`, `allwin`, `axpress`,
+   `axdump`, `screens`) into `~/.cache/os-screen-capture/bin`. Once per machine; rerun if the binaries are gone.
 2. `bash scripts/launch-chrome.sh <scratch-profile-dir> 9333` — visible Chrome on the built-in display.
 3. Start the harness in the background (env vars documented at the top of `scripts/harness.mjs`):
    `PLAYWRIGHT_CORE=<dir> OUT=<record dir> node scripts/harness.mjs`
@@ -45,6 +46,26 @@ only in a **real screen capture of a visible browser under a real mouse hover**.
    `git status` is clean.
 6. Clean up: kill the CDP listener's pid, the harness and the dev server; tell the user the screen is free.
 
+## Record
+
+Recording, real clicks and key presses are installed on `h` by `scripts/record.mjs`:
+
+```js
+async (page, context, h) => {
+  await h.recStart('esc-discard');            // stream lives in its own recorder tab: page reloads do not stop it
+  h.mark('1. open the dialog');               // caption shown from now for 2.5 s
+  await h.click('.open-btn', { fx: 0.7 });    // glide the real cursor there, posted CGEvent press/release
+  await h.click({ x: 40, y: 600 });           // a viewport point — e.g. outside a modal
+  await h.key('Escape');                      // Playwright key press, labelled on the video
+  return h.recStop();                         // -> videos/esc-discard.mp4 + .json (event times)
+}
+```
+
+- `click` targets a CSS selector, a Playwright locator (`page.getByText('Viewer')`) or a viewport point `{ x, y }`; it
+  takes `count: 2` (double-click) and `right: true`. `recStart` takes `crop: 'viewport' | 'window' | 'screen'`.
+- `recStop` writes an mp4 cropped to the browser, with a red ring at each click and a label per key and caption, and
+  deletes the raw full-display webm (it holds every window on the screen); `recStop({ keepRaw: true })` keeps it.
+
 ## Traps
 
 | Symptom | Cause → fix |
@@ -54,9 +75,13 @@ only in a **real screen capture of a visible browser under a real mouse hover**.
 | Share picker shows, stream never starts | An external monitor stops the auto-select flag → csnap answers the picker over AX; labels differ by OS language, find them with `axdump <pid> <title>` and set `PICKER_*` |
 | `getDisplayMedia` fails on a deployed site | Its policy blocks display capture → `const gp = await h.grabFromWindow('http://localhost:<port>/')`, then `csnap(..., { grabPage: gp })` |
 | Cursor covers the text being shown | Hover the lower-right of the target (`fx` 0.6–0.9) |
+| `Target page, context or browser has been closed` on the first step | Another session's browser listens on the same CDP port → pick free ports (`CDP=9343 EVAL_PORT=9494`, launch-chrome with the same CDP port) |
 | Wrong Chrome pid | `pgrep` matches helpers → take the pid from the CDP port's listener (`lsof -tiTCP:9333 -sTCP:LISTEN`) |
 
 ## Output
+
+A recording writes `videos/<name>.mp4` and `videos/<name>.json` (`events`: `t` in seconds from the video start, `click`
+with global points `gx`/`gy`, `key`, `mark`; `box` = crop in screen points; `sc` = device px per point).
 
 Each `csnap` writes `shots/<name>.png` (device pixels of the captured display, cropped to the union of the crop
 selectors, any page tooltip and any native tooltip window, plus 16 px) and `shots/<name>.json`: `pointer` and
