@@ -131,6 +131,9 @@ h.grab = async (file, reg, grabPage = page) => {
 };
 // Native tooltip windows: Chrome-owned, layer 103, global points [x, y, w, h].
 h.nativeWins = () => run('allwin', []).split('\n').filter((l) => l.startsWith(`Google Chrome ${pid()} 103 `)).map((l) => l.trim().split(/\s+/).slice(-4).map(Number));
+// Where macOS draws each cursor relative to its hotspot, in CSS px: [dx, dy, w, h], 3 px of margin included.
+// Measured from real captures at 2x. `auto` has no entry: it is the I-beam over text and the arrow elsewhere.
+const CURSOR_EXTENTS = { default: [-3, -3, 20, 30], 'not-allowed': [-2, -3, 32, 50], pointer: [-9, -4, 28, 34], text: [-9, -16, 18, 32] };
 // Hover `hoverSel` at (fx, fy) of its box with the real cursor, wait, then save shots/<name>.png cropped to the union
 // of `cropSels`, any visible popper tooltip and any native tooltip window, plus a 16 px margin. Writes <name>.json with
 // the pointer position in the crop (CSS px) for annotation.
@@ -159,13 +162,22 @@ h.csnap = async (name, hoverSel, cropSels, { fx = 0.6, fy = 0.6, wait = 1600, p 
   const x1 = Math.max(0, info.x1 - m), y1 = Math.max(0, info.y1 - m), x2 = Math.min(g.iw, info.x2 + m), y2 = Math.min(g.ih, info.y2 + m);
   const file = path.join(OUT, 'shots', `${name}.png`);
   const scale = await h.grab(file, { left: g.left + x1, top: g.top + y1, w: x2 - x1, h: y2 - y1 }, grabPage);
-  const meta = { name, pointer: [Math.round(x - x1), Math.round(y - y1)], size: [Math.round(x2 - x1), Math.round(y2 - y1)], scale, cssCursor: info.cssCursor, hitClass: info.hitClass, nativeTooltip: h.nativeWins().length > 0, bar };
+  const px = Math.round(x - x1), py = Math.round(y - y1);
+  const ext = CURSOR_EXTENTS[info.cssCursor];
+  const cursorBox = ext ? [px + ext[0], py + ext[1], ext[2], ext[3]] : null;
+  const meta = { name, pointer: [px, py], cursorBox, size: [Math.round(x2 - x1), Math.round(y2 - y1)], scale, cssCursor: info.cssCursor, hitClass: info.hitClass, nativeTooltip: h.nativeWins().length > 0, bar };
   fs.writeFileSync(path.join(OUT, 'shots', `${name}.json`), JSON.stringify(meta, null, 1));
   return meta;
 };
 // For an origin whose Permissions-Policy blocks display capture: hold the stream in a separate small window on a
 // capture-allowed origin (moved to another display), keep the target page in front, and pass it as `grabPage`.
-h.grabFromWindow = async (url, bounds = { left: 1600, top: 100, width: 500, height: 400 }) => {
+h.grabFromWindow = async (url, bounds) => {
+  if (!bounds) {
+    // Put the grabber window on the second display (from `screens`); without one it would cover the page.
+    const second = run('screens', []).split('\n').map((l) => l.match(/^1 .*\(([-\d.]+), ([-\d.]+), [\d.]+, [\d.]+\)/)).find(Boolean);
+    if (!second) throw new Error('grabFromWindow needs a second display, or pass bounds');
+    bounds = { left: Math.round(+second[1]) + 50, top: Math.round(+second[2]) + 50, width: 500, height: 400 };
+  }
   const cdp = await browser.newBrowserCDPSession();
   const { targetId } = await cdp.send('Target.createTarget', { url, newWindow: true });
   await sleep(1500);

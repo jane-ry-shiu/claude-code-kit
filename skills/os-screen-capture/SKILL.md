@@ -54,11 +54,12 @@ only in a **real screen capture of a visible browser under a real mouse hover**.
 | Share picker shows, stream never starts | An external monitor stops the auto-select flag → csnap answers the picker over AX; labels differ by OS language, find them with `axdump <pid> <title>` and set `PICKER_*` |
 | `getDisplayMedia` fails on a deployed site | Its policy blocks display capture → `const gp = await h.grabFromWindow('http://localhost:<port>/')`, then `csnap(..., { grabPage: gp })` |
 | Cursor covers the text being shown | Hover the lower-right of the target (`fx` 0.6–0.9) |
-| Cursor unreadable in Jira | Jira serves images ~960 px wide: crop each cell to the control plus a little context so the cursor is enlarged, not shrunk |
-| Jira shows a 250 px card instead of the image | ADF `media` lacks `width`/`height` — set them to the PNG's pixel size; check the real issue view, not only the readback |
 | Wrong Chrome pid | `pgrep` matches helpers → take the pid from the CDP port's listener (`lsof -tiTCP:9333 -sTCP:LISTEN`) |
 
-## After the capture
+## Output
 
-Build the sheet with annotated-screenshots. Box the cursor itself, using the pointer from `<name>.json`; extents from
-the hotspot in CSS px: arrow (0…15, 0…26), not-allowed (+1…+28, −1…+44), I-beam (±6, ±13), hand (−6…+16, −1…+27).
+Each `csnap` writes `shots/<name>.png` (device pixels of the captured display, cropped to the union of the crop
+selectors, any page tooltip and any native tooltip window, plus 16 px) and `shots/<name>.json`: `pointer` and
+`cursorBox` in CSS px of the crop, `cssCursor`, `nativeTooltip`, `bar`. `cursorBox` is the drawn cursor's extent for
+`default`, `not-allowed`, `pointer` and `text`; it is `null` for `auto`, which the OS draws as the I-beam over text and the
+arrow elsewhere — look at the image.
