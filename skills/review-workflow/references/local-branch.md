@@ -2,9 +2,9 @@
 
 ## Overview
 
-Orchestrator skill that reviews feature branch commits, saves findings, then drives the full fix cycle. The fix cycle may continue in the same session or resume in a fresh one after a context-clearing break — the break is offered after Phase 3, never required.
+Orchestrator skill that reviews feature branch commits, saves findings, then drives the full fix cycle in the same session. It does not stop between phases to ask whether to continue; it waits for the user only at the decisions Phase 4a names.
 
-**Core principle:** Dispatch the review to an isolated `reviewer` agent, delegate each subsequent phase to its specialized skill, and hand the user a continuation prompt they may take or skip.
+**Core principle:** Dispatch the review to an isolated `reviewer` agent, delegate each subsequent phase to its specialized skill, and run from review to fix without a continuation prompt.
 
 **Announce at start:** "I'm using the branch-review-workflow skill to review this branch."
 
@@ -22,12 +22,11 @@ digraph branch_review {
     "Parse input" -> "Phase 1: Collect Diff";
     "Phase 1: Collect Diff" -> "Phase 2: Review (reviewer agent)";
     "Phase 2: Review (reviewer agent)" -> "Early Exit check";
-    "Early Exit check" -> "Early Exit: Phase 3 save if asked" [label="PASS or advisory-only"];
-    "Early Exit: Phase 3 save if asked" -> "Done";
+    "Early Exit check" -> "Early Exit: Phase 3 save" [label="PASS or advisory-only"];
+    "Early Exit: Phase 3 save" -> "Done";
     "Early Exit check" -> "Phase 2.5: Verify (verifier agents)" [label="findings worth verifying"];
     "Phase 2.5: Verify (verifier agents)" -> "Phase 3: Save Findings";
-    "Phase 3: Save Findings" -> "Break (offered, not required)";
-    "Break (offered, not required)" -> "Phase 4: Route + Fix (fixer agent)" [label="same session, or new session after clearing"];
+    "Phase 3: Save Findings" -> "Phase 4: Route + Fix (fixer agent)";
     "Phase 4: Route + Fix (fixer agent)" -> "Done";
 }
 ```
@@ -95,10 +94,9 @@ Runs **after Phase 2 and before Phase 2.5**. If Phase 2 returned `PASS — 未�
 findings at the engine's advisory severities (`LOW` for `code-review` and
 `backend-code-review`; `Low` and `Recommend` for `spec-document-reviewer`):
 
-1. Report review summary to user
-2. Ask: "Review 完成，沒有需要修正的項目（或僅有低嚴重度建議）。是否要儲存 review 結果？"
-   - Yes → Save findings via Phase 3, then **stop** (no Phase 4)
-   - No → **Stop**
+1. Save findings via Phase 3 — without asking. The terminal output never prints findings, so
+   the file is the only place advisory findings survive.
+2. Report the review summary to the user, then **stop** (no Phase 4).
 
 Checking here rather than after verification is what makes this an exit. Phase 2.5 dispatches
 at most two agents, and a read-only agent costs on the order of 51k tokens before it does
@@ -107,9 +105,7 @@ then throw the verdicts away at a stop that costs nothing one phase earlier.
 
 A review that exits here has no verdicts, so the file it saves has no `## Verification`
 section and the terminal output omits its 驗證 line. Phase 3's frontmatter, Metadata and
-Description rules apply unchanged — but NOT its Breakpoint subsection, whose continuation
-prompt invites a session into Phase 4 and tells it to read a `## Verification` table this file
-does not have.
+Description rules apply unchanged.
 
 **Per role.** When Phase 2 ran more than one role, this exit is decided per role, not for the
 review. A role that returned `PASS` or advisory-only findings exits here and saves its own
@@ -319,31 +315,17 @@ that took the Early Exit omits the 驗證 line entirely; it verified nothing. Om
 line the engine gives nothing for — `實際套用` is a `code-review` transparency line and a
 document engine has no equivalent; an empty label is worse than an absent one.
 
-### ⏸ Breakpoint (advisory)
+### Into Phase 4
 
-Review no longer runs in this session, so the context pressure that made this break
-mandatory is gone. Offer it, do not force it:
-
-```
-接下來可以直接進入 Phase 4，或清除 context 後貼上以下 prompt 繼續：
----
-continue Phase 4 — 載入 review-workflow skill，讀 references/local-branch.md 的 Phase 4。
-讀取 docs/context/branch-review-{ref-name}.md 作為 review findings；Phase 2 跑了不只一個
-role 時每個檔案各自跑一次 Phase 4a，不要合併兩份的編號。
-判定已經在檔案的 ## Verification 表裡，不要重驗；表開頭的「編號對應」說明 # 欄怎麼
-對回 ## Description，依它對應，不要自己數；not upheld 的不進修復清單。
-依 Phase 4a 的分流表決定每一項的去向——不要每一項都問我，只問表上「先問使用者」那一欄的。
-要問的那些用 brainstorming 確認並產出 design doc；直接派工的那些 settled design 填 none。
-接著依 Phase 4b 派 fixer agent 執行修正——不要在這個 session 自己動手改。
----
-```
+After the terminal output, go straight into Phase 4 in the same turn. Do not ask whether to
+continue, whether to fix, or whether to clear context first, and do not print a continuation
+prompt. The user is asked only where Phase 4a says so: a `cannot tell` or
+`verification failed` verdict, a reformulation candidate, and the "to the user first" column.
 
 ## Phase 4: Route + Fix
 
-**Entry:** either route. Continuing in this session straight after Phase 3 is one entry;
-a fresh session that pasted the Breakpoint's continuation prompt is the other. The break is
-offered, not required, and a session that continued through it reads the findings file exactly
-as a fresh one does.
+**Entry:** straight after Phase 3, in the same session. A fresh session resuming with
+"continue Phase 4" (see Input Parsing) reads the findings file exactly as this one does.
 
 ### Phase 4a: Route
 
@@ -465,7 +447,7 @@ list. **This session commits** — the fixer does not.
 | Running the review engine (`code-review` / `backend-code-review` / `spec-document-reviewer`) in this session instead of dispatching the reviewer agent | Phase 2 dispatches — this session never reads the changed files, and never re-implements review logic either |
 | Re-assembling the findings block when writing the findings file | It is a copy, not a rebuild: first line to last of what the agent returned, nothing re-ordered, dropped or added, transport escaping un-escaped on write |
 | Printing the findings to the terminal | The terminal gets the summary and the path; the file carries the findings |
-| Not offering the breakpoint, or forcing it | It is advisory since review moved to a subagent: offer the continuation prompt, and continue into Phase 4 in this session if the user prefers |
+| Stopping after Phase 3 to ask whether to continue or fix | Go straight into Phase 4; the user is asked only at the decisions Phase 4a names |
 | Sending every finding through brainstorming | Only behaviour-changing fixes need the user; route on the Phase 4a table |
 | Bypassing the fixer agent, manually fixing findings | Always dispatch the fixer agent — it loads the rules governing the file types it edits and validates each fix against its finding. Routing is Phase 4a's and is already decided before the fixer is dispatched |
 | Proceeding to Phase 4 when review found no issues | Check the Phase 2 verdict before dispatching any verifier — if PASS or only advisory-severity findings, take the Early Exit, which sits between Phase 2 and Phase 2.5 |
@@ -481,8 +463,8 @@ list. **This session commits** — the fixer does not.
 
 **This skill DOES:**
 - Orchestrate the full review → fix workflow
-- Offer a context-clearing break after Phase 3 — offer it, never require it — and generate the
-  continuation prompt for a session that takes it
+- Run from review to fix without stopping to ask whether to continue — the user is asked only
+  at the decisions Phase 4a names
 
 **This skill does NOT:**
 - Perform code review directly (dispatches the `reviewer` agent, which runs the review engine)
