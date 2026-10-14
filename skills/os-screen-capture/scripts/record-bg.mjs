@@ -20,7 +20,9 @@ import { spawn } from 'child_process';
 
 const POINTER = { r: 14.4, idle: [255, 204, 0, 0.4], press: [255, 204, 0, 0.55], hold: 0.12, fade: 0.3 };
 const RIPPLE = { dur: 0.5, grow: 2.8, width: 3, alpha: 0.8 }; // ring from r to r * grow, fading out
-const LABEL = { key: 1.2, size: 16, bg: 'rgba(0,0,0,0.75)', keyPrefix: '按鍵：' }; // key: minimum seconds shown
+// key: minimum seconds shown; size/height/padX/bottom/gap in CSS px (bottom: caption box to the video's bottom edge,
+// gap: between the key label and the caption under it)
+const LABEL = { key: 1.2, size: 24, height: 44, padX: 16, bottom: 56, gap: 10, bg: 'rgba(0,0,0,0.5)', keyPrefix: '按鍵：' };
 const GAP = 1; // seconds between the end of one action and the start of the next
 const now = () => Date.now() / 1000;
 
@@ -223,8 +225,8 @@ async function draw({ jpg, spec, cssW, P, RP, L }) {
   g.font = `500 ${L.size * sc}px -apple-system, 'PingFang TC', system-ui, sans-serif`;
   g.textBaseline = 'middle';
   for (const l of spec.labels) {
-    const w = g.measureText(l.text).width, padX = 14 * sc, hgt = 34 * sc;
-    const top = img.height - hgt - 24 * sc - (l.kind === 'key' ? 44 * sc : 0), left = (img.width - w) / 2 - padX;
+    const w = g.measureText(l.text).width, padX = L.padX * sc, hgt = L.height * sc;
+    const top = img.height - hgt - L.bottom * sc - (l.kind === 'key' ? (L.height + L.gap) * sc : 0), left = (img.width - w) / 2 - padX;
     g.fillStyle = L.bg;
     g.beginPath(); g.roundRect(left, top, w + 2 * padX, hgt, 8 * sc); g.fill();
     g.fillStyle = '#fff'; g.fillText(l.text, left + padX, top + hgt / 2);
