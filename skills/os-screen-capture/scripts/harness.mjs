@@ -1,7 +1,10 @@
 // Long-lived harness for capturing what the OS draws (real mouse cursor, native title tooltips) in a visible Chrome.
 // Attach to a Chrome started by launch-chrome.sh, then send steps as POST bodies `async (page, context, h) => ...`.
+// BACKGROUND=1 instead launches its own headless Chrome and records with record-bg.mjs: the user's screen and mouse are
+// never touched, and the OS-drawing helpers (csnap, hover, grab…) throw.
 //
 //   PLAYWRIGHT_CORE=<dir containing node_modules/playwright-core>  (required)
+//   BACKGROUND=1  VIEWPORT=1280x800  SCALE=2  PROFILE=<persistent profile dir, default OUT/bg-profile>  (background only)
 //   CDP=9333  EVAL_PORT=9484  OUT=<dir for shots/ and harness.log>  OSBIN=~/.cache/os-screen-capture/bin
 //   WRITE_GUARD=<regex of API hosts>   abort non-read requests to those hosts, log them as BLOCKED (optional)
 //   BAR_TEXT / BAR_TITLE / BAR_HIDE, PICKER_TITLE / PICKER_SCREEN / PICKER_SHARE: OS-language labels (zh-TW defaults;
@@ -18,6 +21,7 @@ import os from 'os';
 import path from 'path';
 import { execFileSync } from 'child_process';
 import { installRecording } from './record.mjs';
+import { installBackgroundRecording } from './record-bg.mjs';
 
 const env = process.env;
 if (!env.PLAYWRIGHT_CORE) throw new Error('set PLAYWRIGHT_CORE to a directory whose node_modules has playwright-core');
@@ -30,8 +34,14 @@ const LOG = path.join(OUT, 'harness.log');
 const log = (...a) => fs.appendFileSync(LOG, `${new Date().toISOString()} ${a.join(' ')}\n`);
 const state = { blocked: [] };
 
-const browser = await chromium.connectOverCDP(`http://127.0.0.1:${CDP}`);
-const context = browser.contexts()[0];
+const BG = env.BACKGROUND === '1';
+const [VW, VH] = (env.VIEWPORT || '1280x800').split('x').map(Number);
+const browser = BG ? null : await chromium.connectOverCDP(`http://127.0.0.1:${CDP}`);
+const context = BG
+  ? await chromium.launchPersistentContext(env.PROFILE || path.join(OUT, 'bg-profile'), {
+    channel: 'chrome', headless: true, viewport: null, args: [`--window-size=${VW},${VH}`, `--force-device-scale-factor=${env.SCALE || 2}`],
+  })
+  : browser.contexts()[0];
 
 if (env.WRITE_GUARD) {
   const hosts = new RegExp(env.WRITE_GUARD);
@@ -71,6 +81,16 @@ const run = (bin, args) => { try { return execFileSync(path.join(OSBIN, bin), ar
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const pid = () => execFileSync('/usr/sbin/lsof', [`-tiTCP:${CDP}`, '-sTCP:LISTEN']).toString().trim().split('\n')[0];
 const h = { state, log, sleep, run, pid, OUT, page };
+
+// The screencast records the real window, which ignores viewport emulation: size the headless window so the page
+// area is exactly VIEWPORT.
+if (BG) {
+  const c = await context.newCDPSession(page);
+  const { windowId, bounds } = await c.send('Browser.getWindowForTarget');
+  const [iw, ih] = await page.evaluate(() => [innerWidth, innerHeight]);
+  await c.send('Browser.setWindowBounds', { windowId, bounds: { width: bounds.width + VW - iw, height: bounds.height + VH - ih } });
+  await c.detach();
+}
 
 // Native tooltips only appear in the key window: bring Chrome and this tab to the front first.
 h.front = async (p = page) => { await p.bringToFront(); run('activate', [pid()]); await sleep(300); };
@@ -191,7 +211,14 @@ h.grabFromWindow = async (url, bounds) => {
   return gp;
 };
 
-const recordingRoutes = installRecording(h, { context, env, OUT, run, sleep, log });
+const recordingRoutes = BG
+  ? installBackgroundRecording(h, { context, OUT, sleep, log })
+  : installRecording(h, { context, env, OUT, run, sleep, log });
+if (BG) {
+  for (const k of ['front', 'hover', 'barUp', 'hideBar', 'ensureGrab', 'grab', 'nativeWins', 'csnap', 'grabFromWindow']) {
+    h[k] = () => { throw new Error(`h.${k} needs the real screen; restart the harness without BACKGROUND=1`); };
+  }
+}
 
 http.createServer(async (req, res) => {
   try { if (await recordingRoutes(req, res)) return; } catch (e) { res.statusCode = 500; res.end(String(e.stack || e)); return; }

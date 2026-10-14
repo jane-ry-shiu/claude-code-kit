@@ -18,10 +18,13 @@ only in a **real screen capture of a visible browser under a real mouse hover**.
 |---|---|
 | Page content, page-drawn tooltips/popovers (reka, tippy, `role="tooltip"`) | Normal page screenshot (capture-page-screenshots, Playwright) |
 | Cursor shape, native `title` tooltip, native `<select>` popup, other OS-drawn UI | **This skill** |
-| A sequence over time — where the pointer went, what was clicked or pressed, what the page did next; reproducing an issue | **This skill, recording** (`h.recStart` … `h.recStop`) |
+| A sequence over time where the page's reaction is the evidence — open, Cancel, click outside, Esc, reload; reproducing an issue | **This skill, background recording** (`BACKGROUND=1`): headless, the user's screen and mouse are never touched |
+| A sequence that must show the cursor shape or a native tooltip/popup | **This skill, visible recording** — takes over the screen |
 | Only the cursor *value*, no image | `getComputedStyle(elementFromPoint(x, y)).cursor` — but `auto` over text is the I-beam; only `default` is the arrow |
 
-## Before the run
+## Before a visible run
+
+Background mode (`BACKGROUND=1`) skips this section: nothing is taken over.
 
 1. **Ask first.** The run takes over the user's mouse and screen. Say how long (10–20 min), that the mouse moves by
    itself and must not be touched, and to move private windows off the built-in display. Never start unasked; never run
@@ -46,15 +49,20 @@ only in a **real screen capture of a visible browser under a real mouse hover**.
    `git status` is clean.
 6. Clean up: kill the CDP listener's pid, the harness and the dev server; tell the user the screen is free.
 
+Background mode: skip steps 1–2 and start `BACKGROUND=1 PLAYWRIGHT_CORE=<dir> OUT=<dir> node scripts/harness.mjs`; it
+launches its own headless Chrome (`VIEWPORT=1280x800`, `PROFILE=<dir>` keeps a login between runs). Steps are sent the
+same way; `csnap` and the other real-screen helpers throw. Clean up by killing the harness.
+
 ## Record
 
-Recording, real clicks and key presses are installed on `h` by `scripts/record.mjs`:
+The same step runs in either mode: `scripts/record.mjs` (visible) or `scripts/record-bg.mjs` (background) installs it
+on `h`:
 
 ```js
 async (page, context, h) => {
   await h.recStart('esc-discard');            // stream lives in its own recorder tab: page reloads do not stop it
-  h.mark('1. open the dialog');               // caption shown from now for 2.5 s
-  await h.click('.open-btn', { fx: 0.7 });    // glide the real cursor there, posted CGEvent press/release
+  h.mark('1. 打開對話框');                     // caption, shown until the next one
+  await h.click('.open-btn', { fx: 0.7 });    // glide the pointer there and click
   await h.click({ x: 40, y: 600 });           // a viewport point — e.g. outside a modal
   await h.key('Escape');                      // Playwright key press, labelled on the video
   return h.recStop();                         // -> videos/esc-discard.mp4 + .json (event times)
@@ -62,9 +70,16 @@ async (page, context, h) => {
 ```
 
 - `click` targets a CSS selector, a Playwright locator (`page.getByText('Viewer')`) or a viewport point `{ x, y }`; it
-  takes `count: 2` (double-click) and `right: true`. `recStart` takes `crop: 'viewport' | 'window' | 'screen'`.
-- `recStop` writes an mp4 cropped to the browser, with a red ring at each click and a label per key and caption, and
-  deletes the raw full-display webm (it holds every window on the screen); `recStop({ keepRaw: true })` keeps it.
+  takes `count: 2` (double-click) and `right: true`. Both modes deliver trusted events to the page.
+- `recStop` writes an mp4 with a label per key and caption.
+- Captions are 繁體中文, one per step, numbered; UI text and key names stay as the screen shows them
+  (`h.mark('2. 按 Esc，出現 Discard changes?')`).
+- Background: the video is the page area only. A headless browser has no OS cursor, so a translucent yellow circle is
+  drawn following every move; each press darkens it slightly and sends out a ripple. `click` scrolls its target into
+  view first. `click` and `key` wait until 1 s after the previous action, so each result is on screen before the next.
+- Visible: the real cursor, with a red ring at each click. `recStart` takes `crop: 'viewport' | 'window' | 'screen'`.
+  `recStop` deletes the raw full-display webm (it holds every window on the screen); `recStop({ keepRaw: true })`
+  keeps it.
 
 ## Traps
 
@@ -80,8 +95,9 @@ async (page, context, h) => {
 
 ## Output
 
-A recording writes `videos/<name>.mp4` and `videos/<name>.json` (`events`: `t` in seconds from the video start, `click`
-with global points `gx`/`gy`, `key`, `mark`; `box` = crop in screen points; `sc` = device px per point).
+A recording writes `videos/<name>.mp4` and `videos/<name>.json` (`events`: `t` in seconds from the video start, `click`,
+`key`, `mark`). Visible: clicks carry global points `gx`/`gy`, `box` = crop in screen points, `sc` = device px per
+point. Background: clicks carry viewport `x`/`y` in CSS px, plus `viewport` `{ w, h, dpr }`.
 
 Each `csnap` writes `shots/<name>.png` (device pixels of the captured display, cropped to the union of the crop
 selectors, any page tooltip and any native tooltip window, plus 16 px) and `shots/<name>.json`: `pointer` and
