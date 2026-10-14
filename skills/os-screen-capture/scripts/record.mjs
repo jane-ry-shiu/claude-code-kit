@@ -1,42 +1,48 @@
 // Screen recording and real clicks for harness.mjs. Installs on `h`:
 //   click(target, opts)   glide the real cursor onto a CSS selector, Playwright locator or viewport point {x, y} and
 //                         click with posted CGEvents
+//                         While recording, click and key start at least GAP seconds after the previous one finished,
+//                         so the viewer sees each result before the next action.
 //   glide(x, y, p)        move the real cursor smoothly onto viewport point x,y (no click)
 //   key(key, p)           press a key in the page (Playwright) and note it on the recording
-//   mark(text)            caption the recording from now for `dur` seconds (default 2.5)
+//   mark(text, dur)       caption the recording from now until the next caption (or for `dur` seconds)
 //   recStart(name, opts)  start recording the display; the stream lives in its own tab, so the page under test may
 //                         navigate or reload freely
-//   recStop()             stop, upload, crop to the browser, draw click rings and key/caption labels -> videos/<name>.mp4
+//   recStop()             stop, upload, crop to the browser, draw the pointer circle and key/caption labels
+//                         (overlay.mjs, same look as background mode) -> videos/<name>.mp4
 //
 // Why a separate recorder tab: a display stream belongs to the page that opened it and dies on reload. The recorder tab
 // is served by the harness itself (http://127.0.0.1:<EVAL_PORT>/rec), so display capture is never blocked by the
 // tested site's Permissions-Policy, and it uploads the finished recording back to the harness over the same origin.
+// The overlay is drawn in that tab too, as transparent frames that ffmpeg lays over the cropped recording.
 import fs from 'fs';
 import path from 'path';
-import { execFileSync } from 'child_process';
-
-const RING = { size: 36, thick: 4, color: 'red@0.9', dur: 0.45 };
-const LABEL = { key: 1.2, mark: 2.5 };
+import { execFileSync, spawn } from 'child_process';
+import { GAP, LABEL, POINTER, RIPPLE, draw, overlayAt, pipeFrames } from './overlay.mjs';
 
 export const recorderPage = `<!doctype html><meta charset="utf-8"><title>recorder</title>
 <body style="margin:0;background:#111;color:#ccc;font:14px system-ui;display:grid;place-items:center;height:100vh">
-recorder — leave this tab in the background<div id="label"></div></body>`;
+recorder — leave this tab in the background</body>`;
 
 export function installRecording(h, { context, env, OUT, run, sleep, log }) {
   const port = env.EVAL_PORT || '9484';
   const vdir = path.join(OUT, 'videos');
   fs.mkdirSync(vdir, { recursive: true });
   const rec = { active: null, cursor: null };
-  const note = (ev) => { if (rec.active) rec.active.events.push({ t: (Date.now() - rec.active.t0) / 1000, ...ev }); };
+  const now = () => Date.now() / 1000;
+  const note = (ev) => { if (rec.active) rec.active.events.push({ t: now() - rec.active.t0, ...ev }); };
 
   const toGlobal = async (p, x, y) => { const g = await h.geo(p); return [Math.round(g.left + x), Math.round(g.top + y), g]; };
+  const warp = (gx, gy) => run('warp', [String(Math.round(gx)), String(Math.round(gy)), 'post']);
 
   h.glide = async (x, y, p = h.page, { steps = 14, ms = 420 } = {}) => {
     const [gx, gy, g] = await toGlobal(p, x, y);
     const [sx, sy] = rec.cursor || [g.left + g.iw - 30, g.top + g.ih - 30];
     for (let i = 1; i <= steps; i += 1) {
       const k = 1 - (1 - i / steps) ** 2; // ease-out
-      run('warp', [String(Math.round(sx + (gx - sx) * k)), String(Math.round(sy + (gy - sy) * k)), 'post']);
+      const cx = Math.round(sx + (gx - sx) * k), cy = Math.round(sy + (gy - sy) * k);
+      warp(cx, cy);
+      note({ type: 'move', gx: cx, gy: cy });
       await sleep(ms / steps);
     }
     rec.cursor = [gx, gy];
@@ -55,22 +61,33 @@ export function installRecording(h, { context, env, OUT, run, sleep, log }) {
     return { x: r.x + r.w * fx, y: r.y + r.h * fy };
   };
 
+  const waitGap = async () => {
+    if (!rec.active || !rec.lastAction) return;
+    const left = GAP - (now() - rec.lastAction);
+    if (left > 0) await sleep(left * 1000);
+  };
+  const done = () => { rec.lastAction = now(); };
+
   h.click = async (target, { fx = 0.5, fy = 0.5, count = 1, right = false, settle = 250, p = h.page } = {}) => {
+    await waitGap();
     await h.front(p);
     const { x, y } = await pointOf(target, p, fx, fy);
     const { gx, gy } = await h.glide(x, y, p);
     await sleep(120);
-    note({ type: 'click', gx, gy }); // before the press, so the ring lands with the click, not after it
+    // Noted before the press, so the ripple lands with the click, not after it.
+    for (let n = 0; n < count; n += 1) note({ type: 'click', gx, gy, dt: n * 0.12 });
     const out = run('click', [String(gx), String(gy), String(count), right ? 'right' : 'left']);
     await sleep(settle);
+    done();
     return out;
   };
 
-  h.key = async (key, p = h.page) => { await h.front(p); note({ type: 'key', text: key }); await p.keyboard.press(key); await sleep(250); };
-  h.mark = (text, dur = LABEL.mark) => note({ type: 'mark', text, dur });
+  h.key = async (key, p = h.page) => { await waitGap(); await h.front(p); note({ type: 'key', text: key }); await p.keyboard.press(key); await sleep(250); done(); };
+  h.mark = (text, dur) => note({ type: 'mark', text, dur });
 
   h.recStart = async (name, { p = h.page, crop = 'viewport', fps = 30, kbps = 8000 } = {}) => {
     if (rec.active) throw new Error(`already recording ${rec.active.name}`);
+    if (!/^[\w.-]+$/.test(name)) throw new Error(`bad recording name ${name}`);
     let rp = context.pages().find((x) => x.url().startsWith(`http://127.0.0.1:${port}/rec`));
     if (!rp) { rp = await context.newPage(); await rp.goto(`http://127.0.0.1:${port}/rec`); }
     await h.front(rp);
@@ -78,31 +95,39 @@ export function installRecording(h, { context, env, OUT, run, sleep, log }) {
     await h.front(p);
     const bar = await h.hideBar();
     await h.front(p);
-    // t0 is taken inside the recorder tab when recording starts (same wall clock as the harness), so event times
-    // line up with the video instead of lagging by the CDP round trip.
-    const { sc, t0 } = await rp.evaluate(async ({ fps, kbps }) => {
+    const g = await h.geo(p);
+    // Park the cursor where the drawn circle starts, so the two agree from the first frame.
+    rec.cursor = rec.cursor || [Math.round(g.left + g.iw - 30), Math.round(g.top + g.ih - 30)];
+    warp(...rec.cursor);
+    // t0 is taken inside the recorder tab (same wall clock as the harness) right before start(): the webm's time zero
+    // is the start() call, not the later onstart event (~0.1 s after), and not the CDP round trip back here.
+    const { sc, t0 } = await rp.evaluate(async ({ kbps }) => {
       const s = window.__grab.s;
       const type = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'].find((t) => MediaRecorder.isTypeSupported(t));
       const mr = new MediaRecorder(s, { mimeType: type, videoBitsPerSecond: kbps * 1000 });
       window.__rec = { mr, chunks: [] };
       mr.ondataavailable = (e) => { if (e.data.size) window.__rec.chunks.push(e.data); };
-      const startedAt = await new Promise((r) => { mr.onstart = () => r(Date.now()); mr.start(1000); });
+      const startedAt = Date.now();
+      await new Promise((r) => { mr.onstart = r; mr.start(1000); });
       const t = s.getVideoTracks()[0].getSettings();
       return { sc: (t.width || window.__grab.v.videoWidth) / screen.width, t0: startedAt };
-    }, { fps, kbps });
-    const g = await h.geo(p);
+    }, { kbps });
     const box = crop === 'screen' ? null
       : crop === 'window' ? { x: g.sx, y: g.sy, w: g.ow, h: g.oh }
         : { x: g.left, y: g.top, w: g.iw, h: g.ih };
-    rec.active = { name, t0, events: [], sc, box, fps, rp, p, bar };
+    rec.active = { name, t0: t0 / 1000, events: [], sc, box, fps, rp, p, bar };
+    rec.lastAction = null;
+    note({ type: 'move', gx: rec.cursor[0], gy: rec.cursor[1] });
     log('REC start', name, JSON.stringify(box), sc);
     return { name, sc, box, bar };
   };
 
-  h.recStop = async ({ keepRaw = false } = {}) => {
+  h.recStop = async ({ keepRaw = false, tail = 1 } = {}) => {
     const r = rec.active;
     if (!r) throw new Error('not recording');
+    await sleep(tail * 1000);
     rec.active = null;
+    const end = now() - r.t0;
     const raw = path.join(vdir, `${r.name}.webm`);
     if (fs.existsSync(raw)) fs.unlinkSync(raw);
     await r.rp.evaluate(async (name) => {
@@ -112,54 +137,68 @@ export function installRecording(h, { context, env, OUT, run, sleep, log }) {
       const resp = await fetch(`/upload?name=${encodeURIComponent(name)}`, { method: 'POST', body: blob });
       if (!resp.ok) throw new Error(`upload ${resp.status}`);
     }, r.name);
-    const labels = await renderLabels(r);
-    const mp4 = path.join(vdir, `${r.name}.mp4`);
-    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', raw, ...labels.flatMap((l) => ['-i', l.file]),
-      '-filter_complex', filterGraph(r, labels), '-map', '[out]', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '20', '-movflags', '+faststart', mp4]);
-    labels.forEach((l) => fs.unlinkSync(l.file));
+    const b = cropBox(r, raw);
+    const odir = path.join(vdir, `.${r.name}-overlay`);
+    fs.rmSync(odir, { recursive: true, force: true });
+    fs.mkdirSync(odir);
+    try {
+      const frames = await renderOverlay(r, b, end, odir);
+      await encode(r, b, raw, frames, path.join(vdir, `${r.name}.mp4`));
+    } finally { fs.rmSync(odir, { recursive: true, force: true }); }
     if (!keepRaw) fs.unlinkSync(raw); // the raw file is the whole display, private windows included
-    const meta = { name: r.name, mp4, raw: keepRaw ? raw : null, box: r.box, sc: r.sc, duration: (Date.now() - r.t0) / 1000, events: r.events };
+    const events = r.events.filter((e) => e.type !== 'move').map(({ dt, ...e }) => ({ ...e, t: +(e.t + (dt || 0)).toFixed(3) }));
+    const mp4 = path.join(vdir, `${r.name}.mp4`);
+    const meta = { name: r.name, mode: 'visible', mp4, raw: keepRaw ? raw : null, box: r.box, sc: r.sc, duration: +end.toFixed(2), events };
     fs.writeFileSync(path.join(vdir, `${r.name}.json`), JSON.stringify(meta, null, 1));
     await h.front(r.p);
     return meta;
   };
 
-  // Label PNGs are drawn by the recorder tab after recording stops; this ffmpeg build has no drawtext.
-  const renderLabels = async (r) => {
-    const items = r.events.filter((e) => e.type !== 'click');
-    if (!items.length) return [];
-    await r.rp.bringToFront();
+  const even = (n) => Math.max(2, Math.floor(n / 2) * 2);
+  // The crop in device px of the recording; the whole display for crop 'screen'.
+  const cropBox = (r, raw) => {
+    if (r.box) {
+      const s = r.sc;
+      return { x: even(r.box.x * s), y: even(r.box.y * s), w: even(r.box.w * s), h: even(r.box.h * s) };
+    }
+    const [w, hgt] = execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', raw])
+      .toString().trim().split(',').map(Number);
+    return { x: 0, y: 0, w: even(w), h: even(hgt) };
+  };
+
+  // Transparent overlay frames, one per 1/fps, drawn once per distinct spec and held. Event points are global screen
+  // points; the overlay works in points of the crop.
+  const renderOverlay = async (r, b, end, odir) => {
+    const s = r.sc;
+    const events = r.events.map(({ gx, gy, dt, ...e }) => ({
+      ...e, t: e.t + (dt || 0), ...(gx === undefined ? {} : { x: (gx * s - b.x) / s, y: (gy * s - b.y) / s }),
+    }));
     const out = [];
-    for (const [i, e] of items.entries()) {
-      const file = path.join(vdir, `.label-${r.name}-${i}.png`);
-      await r.rp.evaluate(({ text, kind, sc }) => {
-        const el = document.getElementById('label');
-        el.textContent = text;
-        el.style.cssText = `position:fixed;left:0;top:0;padding:${8 * sc}px ${16 * sc}px;border-radius:${8 * sc}px;font:600 ${16 * sc}px system-ui;color:#fff;background:${kind === 'key' ? 'rgba(20,20,20,.85)' : 'rgba(30,64,175,.9)'}`;
-      }, { text: e.type === 'key' ? `⌨ ${e.text}` : e.text, kind: e.type, sc: r.sc });
-      await r.rp.locator('#label').screenshot({ path: file, omitBackground: true });
-      out.push({ file, t: e.t, dur: e.type === 'key' ? LABEL.key : e.dur });
+    let last = null;
+    for (let i = 0; i / r.fps <= end; i += 1) {
+      const spec = overlayAt(events, i / r.fps, { motion: 'hold' });
+      const key = JSON.stringify(spec);
+      if (last && last.key === key) { last.n += 1; continue; }
+      const file = path.join(odir, `${String(out.length).padStart(5, '0')}.png`);
+      const png = await r.rp.evaluate(draw, { w: b.w, h: b.h, spec, cssW: b.w / s, P: POINTER, RP: RIPPLE, L: LABEL });
+      fs.writeFileSync(file, Buffer.from(png, 'base64'));
+      last = { key, file, n: 1 };
+      out.push(last);
     }
     return out;
   };
 
-  const even = (n) => Math.max(2, Math.floor(n / 2) * 2);
-  const filterGraph = (r, labels) => {
-    const s = r.sc;
-    const b = r.box ? { x: even(r.box.x * s), y: even(r.box.y * s), w: even(r.box.w * s), h: even(r.box.h * s) } : null;
-    const steps = ['setpts=PTS-STARTPTS', `fps=${r.fps}`];
-    if (b) steps.push(`crop=${b.w}:${b.h}:${b.x}:${b.y}`);
-    const ox = b ? b.x : 0, oy = b ? b.y : 0, sz = RING.size * s;
-    r.events.filter((e) => e.type === 'click').forEach((e) => {
-      const x = Math.round(e.gx * s - ox - sz / 2), y = Math.round(e.gy * s - oy - sz / 2);
-      steps.push(`drawbox=x=${x}:y=${y}:w=${sz}:h=${sz}:color=${RING.color}:t=${RING.thick * s}:enable='between(t,${e.t.toFixed(2)},${(e.t + RING.dur).toFixed(2)})'`);
-    });
-    let graph = `[0:v]${steps.join(',')}[v0]`;
-    labels.forEach((l, i) => {
-      graph += `;[v${i}][${i + 1}:v]overlay=x=(W-w)/2:y=H-h-${24 * s}:enable='between(t,${l.t.toFixed(2)},${(l.t + l.dur).toFixed(2)})'[v${i + 1}]`;
-    });
-    return `${graph};[v${labels.length}]null[out]`;
-  };
+  const encode = (r, b, raw, frames, mp4) => new Promise((ok, fail) => {
+    const graph = `[0:v]setpts=PTS-STARTPTS,fps=${r.fps},crop=${b.w}:${b.h}:${b.x}:${b.y}[v];`
+      + `[1:v]format=rgba[o];[v][o]overlay=0:0:eof_action=repeat[out]`;
+    const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-i', raw, '-f', 'image2pipe', '-framerate', String(r.fps), '-c:v', 'png', '-i', '-',
+      '-filter_complex', graph, '-map', '[out]', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '20', '-movflags', '+faststart', mp4]);
+    let err = '';
+    ff.stderr.on('data', (c) => { err += c; });
+    ff.on('error', fail);
+    ff.on('close', (code) => (code === 0 ? ok() : fail(new Error(`ffmpeg ${code}: ${err}`))));
+    pipeFrames(ff.stdin, frames, fs.readFileSync).catch(fail);
+  });
 
   // Routes for the harness HTTP server: the recorder page and the upload sink. Returns true when it handled the request.
   return async (req, res) => {

@@ -74,12 +74,14 @@ async (page, context, h) => {
 - `recStop` writes an mp4 with a label per key and caption.
 - Captions are 繁體中文, one per step, numbered; UI text and key names stay as the screen shows them
   (`h.mark('2. 按 Esc，出現 Discard changes?')`).
-- Background: the video is the page area only. A headless browser has no OS cursor, so a translucent yellow circle is
-  drawn following every move; each press darkens it slightly and sends out a ripple. `click` scrolls its target into
-  view first. `click` and `key` wait until 1 s after the previous action, so each result is on screen before the next.
-- Visible: the real cursor, with a red ring at each click. `recStart` takes `crop: 'viewport' | 'window' | 'screen'`.
-  `recStop` deletes the raw full-display webm (it holds every window on the screen); `recStop({ keepRaw: true })`
-  keeps it.
+- Both modes draw the same overlay: a translucent yellow circle following the pointer, slightly darker on each press,
+  with a ripple from the click point. `click` and `key` wait until 1 s after the previous action, so each result is on
+  screen before the next.
+- Background: the video is the page area only; the circle stands in for the cursor a headless browser lacks. `click`
+  scrolls its target into view first.
+- Visible: the circle sits over the real cursor and follows `glide`/`click` moves only (not `hover`). `recStart`
+  takes `crop: 'viewport' | 'window' | 'screen'`. `recStop` deletes the raw full-display webm (it holds every window on
+  the screen); `recStop({ keepRaw: true })` keeps it.
 
 ## Traps
 

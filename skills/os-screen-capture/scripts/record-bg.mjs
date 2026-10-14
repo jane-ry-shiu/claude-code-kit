@@ -17,13 +17,8 @@
 import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
+import { GAP, LABEL, POINTER, RIPPLE, draw, overlayAt, pipeFrames } from './overlay.mjs';
 
-const POINTER = { r: 14.4, idle: [255, 204, 0, 0.4], press: [255, 204, 0, 0.55], hold: 0.12, fade: 0.3 };
-const RIPPLE = { dur: 0.5, grow: 2.8, width: 3, alpha: 0.8 }; // ring from r to r * grow, fading out
-// key: minimum seconds shown; size/height/padX/bottom/gap in CSS px (bottom: caption box to the video's bottom edge,
-// gap: between the key label and the caption under it)
-const LABEL = { key: 1.2, size: 24, height: 44, padX: 16, bottom: 56, gap: 10, bg: 'rgba(0,0,0,0.5)', keyPrefix: '按鍵：' };
-const GAP = 1; // seconds between the end of one action and the start of the next
 const now = () => Date.now() / 1000;
 
 export function installBackgroundRecording(h, { context, OUT, sleep, log }) {
@@ -123,44 +118,6 @@ export function installBackgroundRecording(h, { context, OUT, sleep, log }) {
     return meta;
   };
 
-  // Pointer position and look at time t (absolute seconds).
-  const pointerAt = (r, t) => {
-    const moves = r.events.filter((e) => e.type === 'move' || e.type === 'click');
-    let prev = moves[0];
-    for (const m of moves) {
-      if (m.t > t) {
-        if (m.t - prev.t > 0.2 || m.t <= prev.t) break; // idle gap: stay put
-        const k = (t - prev.t) / (m.t - prev.t);
-        return { x: prev.x + (m.x - prev.x) * k, y: prev.y + (m.y - prev.y) * k };
-      }
-      prev = m;
-    }
-    return { x: prev.x, y: prev.y };
-  };
-  const pressAt = (r, t) => { // 1 = pressed, fading to 0 = idle
-    let k = 0;
-    r.events.filter((e) => e.type === 'click').forEach((c) => {
-      const dt = t - c.t;
-      if (dt >= 0 && dt <= POINTER.hold) k = 1;
-      else if (dt > POINTER.hold && dt <= POINTER.hold + POINTER.fade) k = Math.max(k, 1 - (dt - POINTER.hold) / POINTER.fade);
-    });
-    return +k.toFixed(2);
-  };
-  const ripplesAt = (r, t) => r.events
-    .filter((e) => e.type === 'click' && t >= e.t && t <= e.t + RIPPLE.dur)
-    .map((e) => ({ x: +e.x.toFixed(1), y: +e.y.toFixed(1), k: +((t - e.t) / RIPPLE.dur).toFixed(2) }));
-  // A caption stays until the next caption; a key label until the next action or caption (at least LABEL.key).
-  const labelEnd = (r, e) => {
-    if (e.type === 'mark' && e.dur) return e.t + e.dur;
-    const ends = e.type === 'mark' ? ['mark'] : ['click', 'key', 'mark'];
-    const next = r.events.find((x) => x !== e && x.t > e.t && ends.includes(x.type));
-    const end = next ? next.t : Infinity;
-    return e.type === 'key' ? Math.max(end, e.t + LABEL.key) : end;
-  };
-  const labelsAt = (r, t) => r.events
-    .filter((e) => (e.type === 'key' || e.type === 'mark') && t >= e.t && t < labelEnd(r, e))
-    .map((e) => ({ kind: e.type, text: e.type === 'key' ? `${LABEL.keyPrefix}${e.text}` : e.text }));
-
   // One output frame per 1/fps; identical consecutive frames are drawn once and held. Drawing happens on a blank page
   // in the same headless browser, so no image library is needed.
   const render = async (r, t0, end) => {
@@ -171,9 +128,8 @@ export function installBackgroundRecording(h, { context, OUT, sleep, log }) {
       for (let i = 0; i * (1 / r.fps) <= end - t0; i += 1) {
         const t = t0 + i / r.fps;
         while (fi + 1 < r.frames.length && r.frames[fi + 1].t <= t) fi += 1;
-        const pt = pointerAt(r, t);
-        const spec = { fi, x: +pt.x.toFixed(1), y: +pt.y.toFixed(1), press: pressAt(r, t), ripples: ripplesAt(r, t), labels: labelsAt(r, t) };
-        const key = JSON.stringify(spec);
+        const spec = overlayAt(r.events, t);
+        const key = JSON.stringify({ fi, spec });
         if (last && last.key === key) { last.n += 1; continue; }
         const file = path.join(r.fdir, `out-${String(out.length).padStart(5, '0')}.jpg`);
         const jpg = fs.readFileSync(r.frames[fi].file).toString('base64');
@@ -186,7 +142,6 @@ export function installBackgroundRecording(h, { context, OUT, sleep, log }) {
     return out;
   };
 
-  // Each drawn frame is piped as many times as it is held: the concat demuxer's per-image durations are not reliable.
   const encode = (frames, mp4, fps) => new Promise((ok, fail) => {
     const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-c:v', 'mjpeg', '-i', '-',
       '-vf', 'pad=ceil(iw/2)*2:ceil(ih/2)*2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '20', '-movflags', '+faststart', mp4]);
@@ -194,45 +149,8 @@ export function installBackgroundRecording(h, { context, OUT, sleep, log }) {
     ff.stderr.on('data', (c) => { err += c; });
     ff.on('error', fail);
     ff.on('close', (code) => (code === 0 ? ok() : fail(new Error(`ffmpeg ${code}: ${err}`))));
-    (async () => {
-      for (const f of frames) {
-        const buf = fs.readFileSync(f.file);
-        for (let i = 0; i < f.n; i += 1) if (!ff.stdin.write(buf)) await new Promise((r) => ff.stdin.once('drain', r));
-      }
-      ff.stdin.end();
-    })().catch(fail);
+    pipeFrames(ff.stdin, frames, fs.readFileSync).catch(fail);
   });
 
   return async () => false; // no HTTP routes: the screencast needs no recorder tab
-}
-
-// Runs in the drawing page: frame + pointer circle + labels -> base64 jpeg.
-async function draw({ jpg, spec, cssW, P, RP, L }) {
-  const img = await createImageBitmap(await (await fetch(`data:image/jpeg;base64,${jpg}`)).blob());
-  const sc = img.width / cssW;
-  const cv = new OffscreenCanvas(img.width, img.height);
-  const g = cv.getContext('2d');
-  g.drawImage(img, 0, 0);
-  const mix = P.idle.map((v, i) => v + (P.press[i] - v) * spec.press);
-  g.fillStyle = `rgba(${Math.round(mix[0])},${Math.round(mix[1])},${Math.round(mix[2])},${mix[3]})`;
-  g.beginPath(); g.arc(spec.x * sc, spec.y * sc, P.r * sc, 0, Math.PI * 2); g.fill();
-  for (const rp of spec.ripples) {
-    const e = 1 - (1 - rp.k) ** 2; // ease-out
-    g.strokeStyle = `rgba(${P.idle[0]},${P.idle[1]},${P.idle[2]},${RP.alpha * (1 - rp.k)})`;
-    g.lineWidth = RP.width * sc;
-    g.beginPath(); g.arc(rp.x * sc, rp.y * sc, P.r * (1 + (RP.grow - 1) * e) * sc, 0, Math.PI * 2); g.stroke();
-  }
-  g.font = `500 ${L.size * sc}px -apple-system, 'PingFang TC', system-ui, sans-serif`;
-  g.textBaseline = 'middle';
-  for (const l of spec.labels) {
-    const w = g.measureText(l.text).width, padX = L.padX * sc, hgt = L.height * sc;
-    const top = img.height - hgt - L.bottom * sc - (l.kind === 'key' ? (L.height + L.gap) * sc : 0), left = (img.width - w) / 2 - padX;
-    g.fillStyle = L.bg;
-    g.beginPath(); g.roundRect(left, top, w + 2 * padX, hgt, 8 * sc); g.fill();
-    g.fillStyle = '#fff'; g.fillText(l.text, left + padX, top + hgt / 2);
-  }
-  const blob = await cv.convertToBlob({ type: 'image/jpeg', quality: 0.92 });
-  const buf = new Uint8Array(await blob.arrayBuffer());
-  let s = ''; for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode(...buf.subarray(i, i + 0x8000));
-  return btoa(s);
 }
