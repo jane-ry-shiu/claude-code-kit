@@ -106,3 +106,12 @@ selectors, any page tooltip and any native tooltip window, plus 16 px) and `shot
 `cursorBox` in CSS px of the crop, `cssCursor`, `nativeTooltip`, `bar`. `cursorBox` is the drawn cursor's extent for
 `default`, `not-allowed`, `pointer` and `text`; it is `null` for `auto`, which the OS draws as the I-beam over text and the
 arrow elsewhere — look at the image.
+
+## Deliver
+
+What goes into a Jira comment, PR or record is the `videos/<name>.mp4` files exactly as `recStop` wrote them: one
+video per run, at its recorded resolution, with no ffmpeg pass in between. A before/after pair is two videos, placed one
+after the other under the item's heading, each with its own line saying which version it is (部署版 / 本機版). Each
+video file holds exactly one run: no `hstack`, `vstack`, overlay or concat of runs, and no scaling down. The reader
+watches in a player of fixed width (a Jira comment is about 750 px); two runs side by side in one frame show each page
+at half the size, and the UI becomes too small to read. More players in the comment is the cost of readable ones.
