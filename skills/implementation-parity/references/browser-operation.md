@@ -38,7 +38,7 @@ curl -s http://localhost:9222/json/list
 
 Screenshots are inline by default. `take_screenshot` with `filePath` writes only inside a
 workspace root, which dirties `git status`; persist an image only when a specific difference needs
-it as evidence.
+it as evidence, or when the ticket or the user asks for a picture of that state.
 
 ## Approach hierarchy
 
@@ -51,7 +51,9 @@ Four ways to get an answer out of the page, in order of preference:
 3. **`take_snapshot`** — only when you need the a11y tree to find an element to interact with, or
    to confirm structural state (dialog open, role=alert appeared). See Snapshot usage below for
    rules on when to re-snapshot vs reuse uids.
-4. **`take_screenshot`** — only for visual items.
+4. **`take_screenshot`** — only for visual items. It never contains what the operating system
+   draws — native `title` tooltips, the cursor, native `<select>` popups; those are observed per
+   `SKILL.md`, `## Observing OS-drawn UI`.
 
 The process below describes the snapshot-driven flow. Use it for the *interaction* part (clicking,
 filling), but verify the *outcome* via state inspection whenever the store reflects what is being
@@ -562,14 +564,15 @@ immediately after the action and again after the closing action.
 |---|---|
 | Treating `drag` "Successfully" as proof of success | Always verify the side effect |
 | Retrying drag with the same uids | Change `from_uid` or `to_uid` each attempt |
-| Retrying more than 3 times | Stop, report BLOCKED, escalate to user |
+| Retrying more than 3 times | Stop, record the item SKIP with what was tried, open the next item |
 | Dragging a StaticText label that's inside a `group` | Drag the `group` (use verbose snapshot once if needed) |
 | Dropping onto a button inside the drop region | Pick the region/canvas itself, not its inner controls |
 | Skipping verification because "it looked like it worked" | "Looked like" is not evidence; query state or DOM |
 
 ## Retry policy
 
-Cap retries at **3 attempts**. Beyond that, escalate to the user — do not retry indefinitely.
+Cap retries at **3 attempts**, then the escape hatch below. Beyond that the item ends `SKIP` and the
+run moves to the next item — do not retry indefinitely, and do not stop the run to ask.
 
 ```
 attempt 1: best-guess uids (from_uid + to_uid rules above)
@@ -579,10 +582,12 @@ attempt 2: change from_uid (try the parent or child of the previous choice)
 attempt 3: change to_uid (try a different region/canvas; avoid any element you suspect has its own click handler)
   └─ verify → ok? done. failed? STOP.
 
-STOP → report BLOCKED with:
-  - All from/to uid combinations attempted
+attempt 3 failed → escape hatch below → verify → ok? done. failed? STOP.
+
+STOP → the item is SKIP. Its execution log records:
+  - All from/to uid combinations attempted, and the escape hatch's result
   - Snapshot of the relevant region (so a human can see the structure)
-  - Suggestion: try escape hatch, or ask user to perform manually
+The step-9 report lists it as an item the user can check by hand.
 ```
 
 ### Escape hatch: synthetic DragEvent
@@ -608,5 +613,5 @@ Last resort when MCP `drag` cannot succeed. Use `evaluate_script` to dispatch th
 - Vue Draggable / SortableJS / similar JS-based libraries: synthetic events usually work
 - HTML5 native drag-and-drop with `isTrusted` checks: synthetic events get rejected
 - Always verify the side effect afterwards (Verifying the side effect above). If the synthetic
-  events don't take effect, ask the user to perform the action manually and continue verification
-  from a known state.
+  events don't take effect, the item ends `SKIP` per Retry policy above, and the run continues from
+  the next item.

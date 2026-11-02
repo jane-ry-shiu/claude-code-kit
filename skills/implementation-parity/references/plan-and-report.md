@@ -61,6 +61,7 @@ number.
 - Implementation action: <what is done on the implementation>
 - Compare on: <state | timing | request dispatch | appearance | description>
 - Setup: <what is created or overridden for this item, and how it is undone | none>
+- Screen capture: <why a picture of OS-drawn UI is needed | none>
 
 #### Execution log
 - Started: <HH:mm>
@@ -142,6 +143,9 @@ with it.
 - Batch-closing several items in one turn is forbidden.
 - An item whose result cannot be determined is `SKIP`, with `Baseline observed:` recording *why*
   it could not be determined. Never guessed SAME or DIFFERENT.
+- Items with a `Screen capture:` line get their pictures in one takeover after the last item has
+  closed (`SKILL.md`, `## Observing OS-drawn UI`). Each picture's path is added to that item's
+  `Evidence:` in its own edit; the item is not reopened and its verdict does not change.
 
 ### The identity-conflict exception
 

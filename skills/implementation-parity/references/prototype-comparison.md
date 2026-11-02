@@ -70,7 +70,7 @@ it.
 
 A change the item itself requires — the flag the item is about, the data state it starts from — is
 not a cleaner read. It is setup under `SKILL.md`'s `## Item setup`: make it, record it on the item's
-`Setup:` line, undo it at cleanup.
+`Setup:` line, undo it when that section says.
 
 ## Paired action execution
 

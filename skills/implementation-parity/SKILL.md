@@ -127,6 +127,22 @@ The gate message ends with one request — confirm the list — and the user's s
 unmet requirement after the run means the work was spent to produce "could not determine", which
 the list could have predicted.
 
+**Read the prototype's source before the gate.** A tier-1 prototype is usually a static site:
+fetching its HTML and scripts with `curl` opens no browser, so it is done before confirmation. For
+each tier-1 item, find in that source whether the prototype shows the item's state as it stands,
+through a route in `## Item setup` on the prototype's page (fulfil the data request it makes, set
+the value its code reads), or not at all, and mark the prototype side the same way as the
+implementation side. An item whose state the prototype has no code for is compared against the
+ticket's text instead — tier 3 for that item — and the gate message says so. When the source
+cannot be fetched (it needs a login, it is a Figma prototype), the gate message says so, and the
+prototype side is settled during step 6.
+
+**An item whose result the operating system draws** — a native `title` tooltip, the cursor shape, a
+native `<select>` popup — is observed as `## Observing OS-drawn UI` describes. When it needs a
+screen capture, the gate message names those items and how long the screen will be taken over; the
+user's single confirmation covers the takeover. Run `os-screen-capture`'s Accessibility check before
+the gate: if it prints `false`, granting it is the one thing the gate message asks the user to supply.
+
 No reference to load.
 
 ### 4. Write comparison plan
@@ -154,7 +170,8 @@ an explicit non-terminal state between them, defined in `references/plan-and-rep
 
 Load: `references/browser-operation.md` for the lane setup and operating mechanics, plus
 `references/prototype-comparison.md` for tier 1 items or `references/visual-comparison.md` for
-tier 2 items, depending on which tier the item's baseline is.
+tier 2 items, depending on which tier the item's baseline is. The screen-capture pass of
+`## Observing OS-drawn UI` uses the `os-screen-capture` skill.
 
 ### 7. Classify differences
 
@@ -198,7 +215,9 @@ implemented leaves no trace in the diff.
 ## Item setup
 
 A requirement you can create and undo yourself is part of executing the item. Set it up during step
-6, record it in the item's `Setup:` line, and undo it at cleanup.
+6 and record it in the item's `Setup:` line. An in-page override — an interception, a flag or store
+value — is undone when its item closes, so it cannot leak into the next item; records you created
+stay until cleanup, since later items and the screen-capture pass may need them.
 
 | Requirement | Setup | Undo |
 |---|---|---|
@@ -209,6 +228,8 @@ A requirement you can create and undo yourself is part of executing the item. Se
 | Another role | Log in with an account already listed in the project's fixtures | Log back in as the account you started with |
 | A local dev server, the shared Chrome | Start it | Stop only what you started |
 
+The in-page routes work on the prototype's page as well as the implementation's.
+
 Reach a data state by creating new records. A record you created is undone by deleting it; a record
 you deleted that you did not create cannot be put back as it was — its id, history and links are
 gone — so that route is never taken, even when it is the shorter one.
@@ -217,6 +238,32 @@ Ask before acting only when the undo needs someone else or other people see the 
 undo it: anything posted to a PR, Jira, Confluence or a chat; creating or changing user accounts,
 roles or permissions; org-level settings in the backend; deleting a record you did not create.
 Those rows are `out of reach` at the step-3 gate.
+
+## Observing OS-drawn UI
+
+A screenshot from the browser lanes copies the page's own pixels. The operating system draws native
+`title` tooltips, the mouse cursor and native `<select>` popups in windows of their own, so no lane
+screenshot contains them, and a caption drawn onto a screenshot is not evidence of what the user
+sees.
+
+| What is needed | How | Takes over the user's screen |
+|---|---|---|
+| The verdict: which text, which cursor, which options | Read it from the page. Tooltip: hover the target, take `document.elementFromPoint` at the pointer, walk up to the nearest element with a `title` attribute — an empty `title=""` stops the walk and means no tooltip. Cursor: `getComputedStyle(el).cursor` — `auto` over text is the I-beam, only `default` is the arrow | No |
+| A picture of it: the ticket or the user asks for a screenshot of that state, or a `DIFFERENT` in OS-drawn UI goes to a PR as evidence | The `os-screen-capture` skill, visible mode | Yes, 10–20 minutes |
+
+The page read decides the verdict; the picture is evidence added to it. Every capture of the run
+happens in one takeover, after the last item has its verdict — not one takeover per item, and not
+between items. Send one line when it starts (it starts now, how long, do not touch the mouse) and
+one when the screen is free; both are notices, not questions.
+
+The capture Chrome has its own profile and starts logged out. Carry the implementation's login over:
+read `localStorage` for the implementation's origin in lane b, write those entries into the capture
+page on the same origin, then reload. The prototype needs no carrying when it has no login.
+
+A capture the step-3 list did not predict is not asked for mid-run. The item closes on its page
+read, its `Evidence:` says `screen capture pending`, and the step-7 message asks once for the
+takeover and its length, next to the candidate list. If the user declines, the page read stands and
+`Evidence:` says no picture was taken.
 
 ## HARD-GATE
 
