@@ -170,5 +170,5 @@ the plan file is written, not only in this run's working memory.
 | Server start fails (port in use by non-dev process) | Report error, abort |
 | Server starts but page blank/errors | Record as pre-condition failure |
 | The resolved port already answers, but the listening process's `cwd` belongs to a different app | Abort; report the port conflict — do not use it and do not start a second server on the same port |
-| `shared-chrome.sh status` reports `down` | Inform user, abort |
+| `shared-chrome.sh status` still reports `down` after you started it (Step 4) | Say what you ran and what it reported, abort |
 | A browser lane fails `list_pages` after `status` reports up (either lane, or both) | Inform user which lane(s) failed, abort |

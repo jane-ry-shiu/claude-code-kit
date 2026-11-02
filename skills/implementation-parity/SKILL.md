@@ -111,13 +111,21 @@ Present the list to the user and wait for confirmation before doing anything els
 HARD-GATE rule 1, and it holds even when the list looks obvious. No browser opens before this
 confirmation lands.
 
-**Each item is presented with what it needs, and whether that is already true.** Test data, a
+**Each item is presented with what it needs, and how that requirement will be met.** Test data, a
 feature flag, a second account, a particular org — name the requirement next to the item and mark it
-satisfied or not. An item whose requirement is unmet is heading for `SKIP`; say so at this gate,
-while the user can still supply the data, turn the flag on, or drop the item. Discovering it after
-the run means the work was spent to produce "could not determine", which the list could have
-predicted. A run that ends with several SKIPs whose causes were all knowable up front failed at this
-step, not at execution.
+with exactly one of:
+
+| Mark | Meaning | What the gate message says about it |
+|---|---|---|
+| ready | Already true now | Nothing more |
+| I set it up | Reachable through `## Item setup` below | What you will create or override, and how it is undone — stated as what will happen, not offered as an option |
+| out of reach | No route in `## Item setup` reaches it | Why, and that the item ends `SKIP` unless the user supplies it |
+
+An item is marked `out of reach` only after every row of `## Item setup` has been tried against it.
+The gate message ends with one request — confirm the list — and the user's single reply covers every
+`I set it up` row. Only `out of reach` rows name something the user could supply. Discovering an
+unmet requirement after the run means the work was spent to produce "could not determine", which
+the list could have predicted.
 
 No reference to load.
 
@@ -187,6 +195,29 @@ implemented leaves no trace in the diff.
 | Also compare | Touched by the diff but absent from the baseline — possibly unrequested work |
 | Skip | Neither |
 
+## Item setup
+
+A requirement you can create and undo yourself is part of executing the item. Set it up during step
+6, record it in the item's `Setup:` line, and undo it at cleanup.
+
+| Requirement | Setup | Undo |
+|---|---|---|
+| Data in a state that does not exist yet (0 rows, exactly N rows, a row to delete) | Create new records — a new site, uploaded files, new rows — named `parity-<topic>-…` | Delete what you created |
+| An existing record must hold a different value | Write its original value into the plan, then change it | Write the original value back |
+| A response the backend does not give on its own (error, empty, slow) | Intercept or fulfil the request in the page | Remove the interception, or reload |
+| A flag or store value | Override it in the page, not in the backend | Reload |
+| Another role | Log in with an account already listed in the project's fixtures | Log back in as the account you started with |
+| A local dev server, the shared Chrome | Start it | Stop only what you started |
+
+Reach a data state by creating new records. A record you created is undone by deleting it; a record
+you deleted that you did not create cannot be put back as it was — its id, history and links are
+gone — so that route is never taken, even when it is the shorter one.
+
+Ask before acting only when the undo needs someone else or other people see the change before you
+undo it: anything posted to a PR, Jira, Confluence or a chat; creating or changing user accounts,
+roles or permissions; org-level settings in the backend; deleting a record you did not create.
+Those rows are `out of reach` at the step-3 gate.
+
 ## HARD-GATE
 
 ```
@@ -194,6 +225,8 @@ implemented leaves no trace in the diff.
 2. The candidate list is presented and confirmed by the user BEFORE anything on a PR is touched.
 3. An item whose result cannot be determined is recorded SKIP. Never guessed PASS or FAIL.
 4. Never submit a review. No `event` parameter, no `submit_pending`, no offering to submit.
+5. Setup listed in `## Item setup` is done, not asked about. Every setup is undone before step 9, and
+   anything that could not be undone is named in the step-9 report.
 ```
 
 ## Reference Loading Rule

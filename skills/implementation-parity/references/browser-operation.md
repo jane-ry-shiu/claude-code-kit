@@ -131,7 +131,9 @@ For each item, record:
 
 ### Principles
 
-- This is a dev environment — don't avoid destructive operations (creating/deleting data is fine)
+- This is a dev environment — creating data and deleting what you created is fine, without asking.
+  Deleting a record you did not create is not: reach the state by creating new records instead
+  (`SKILL.md`, `## Item setup`)
 - Execute items in the order given
 - Each item is independently recorded
 - If a step fails mid-way, record FAIL with the step that failed and what happened instead

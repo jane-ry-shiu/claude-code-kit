@@ -60,6 +60,7 @@ number.
 - Baseline action: <what is done on the prototype, or which frame / which clause>
 - Implementation action: <what is done on the implementation>
 - Compare on: <state | timing | request dispatch | appearance | description>
+- Setup: <what is created or overridden for this item, and how it is undone | none>
 
 #### Execution log
 - Started: <HH:mm>
@@ -80,7 +81,8 @@ Execution log, and increment the number)*
 
 ## Cleanup
 
-- [ ] Test data created: <list>
+- [ ] Setup undone: <one line per item `Setup:` — what was undone, and the read that confirmed it>
+- [ ] Original account logged back in: <account | not switched>
 - [ ] Dev server: <stop if started by skill / leave running>
 ```
 
@@ -230,6 +232,8 @@ where it landed**, with the identifier needed to find it, in this exact template
   1. <差異一句話>
 建議你手動處理（這個方法答不了）：{N} 條
   1. <一句話，說明為什麼答不了>
+
+環境還原：{全部還原 | 沒能還原：<哪一項設定、現在的狀態、為什麼>}
 
 報告：<plan file path>
 ```

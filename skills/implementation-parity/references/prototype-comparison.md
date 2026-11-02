@@ -44,10 +44,12 @@ Runs before any navigation — before lane a or lane b opens a tab for this item
 
 > Cookies and localStorage are browser-wide, not per lane. If the prototype and the
 > implementation require different identities, they cannot share a browser — signing into one
-> evicts the other. Ask the user up front. If they conflict, compare one side fully, record its
+> evicts the other. Settle it up front. If they conflict, compare one side fully, record its
 > observations in the plan file, then compare the other; do not interleave.
 
-Concretely: ask whether the prototype and the implementation authenticate as the same account. If
+Concretely: find out whether the prototype and the implementation authenticate as the same account —
+open the prototype and see whether it asks for a login at all, and read the ticket for the account it
+names. Ask the user only when neither tells you. If
 they do, both lanes can stay open together and the default per-item procedure below (`## Paired
 action execution`) runs as written. If they do not, follow `## When identities conflict` under
 that section instead — the four-reading comparison still happens, just not with both lanes live at
@@ -65,6 +67,10 @@ later item in this run and in whatever runs after it — the same rule `browser-
 "never change page state for a cleaner capture." If a comparison is awkward to observe as the page
 stands, record the obstruction in the item's execution log rather than reaching for a toggle to fix
 it.
+
+A change the item itself requires — the flag the item is about, the data state it starts from — is
+not a cleaner read. It is setup under `SKILL.md`'s `## Item setup`: make it, record it on the item's
+`Setup:` line, undo it at cleanup.
 
 ## Paired action execution
 
