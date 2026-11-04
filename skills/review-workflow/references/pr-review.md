@@ -28,9 +28,10 @@ These rules are non-negotiable for ALL PR reviews.
 
 ```dot
 digraph pr_review {
-    "1. Resolve PR context" -> "2. Checkout PR branch";
-    "2. Checkout PR branch" -> "3. Invoke code-review";
-    "3. Invoke code-review" -> "4. Validate comments";
+    "1. Resolve PR context" -> "2a. Load code-review rules";
+    "2a. Load code-review rules" -> "2b. Checkout PR branch";
+    "2b. Checkout PR branch" -> "3. Run code-review";
+    "3. Run code-review" -> "4. Validate comments";
     "4. Validate comments" -> "5. Create pending comments";
     "5. Create pending comments" -> "6. Notify user";
 }
@@ -43,7 +44,29 @@ Use `github-pr` skill (or GitHub MCP tools directly) to gather:
 - PR diff
 - Existing review comments (to avoid duplicates)
 
-## Step 2: Checkout PR Branch
+Step 1's output is exactly these three items. Every other read — the changed files in full,
+their callers, a dependency PR's source — belongs to Step 3, after the rules are loaded.
+
+## Step 2: Load Rules, Then Checkout
+
+### 2a. Load code-review rules
+
+Invoke the `code-review` skill now, before checkout, passing the PR title as branch objective
+for scope classification, and run the parts that need only Step 1's file list:
+
+1. Its Steps 1–3: classify the changed files, build the candidate skill list, run the
+   contract-change gate
+2. Its Step 5 activation prelude: read the SKILL.md of every mandatory and user-specified
+   candidate
+
+2a's output is the list of skills whose SKILL.md was actually read. Checkout and every file
+read come after that list exists.
+
+Why this order: a reader who opens the changed files first forms a verdict before any rule is
+loaded, and the rules then only get checked against that verdict. A mandatory skill that was
+never read stays unread without anything noticing.
+
+### 2b. Checkout PR branch
 
 **Goal:** Full local file access for enclosing-scope analysis, always at PR's latest commit.
 
@@ -62,12 +85,12 @@ Use `github-pr` skill (or GitHub MCP tools directly) to gather:
    ```
 4. If fetch fails (permissions, network), fall back to API-only mode (diff from Step 1)
 
-## Step 3: Invoke code-review
+## Step 3: Run code-review
 
-Delegate analysis entirely to `code-review` skill:
-- `code-review` runs Steps 1–5 (classify files, discover skills, review, produce findings)
+Continue the `code-review` run started in 2a. Delegate analysis entirely to it:
+- `code-review` runs its Step 5 per-file loop and Step 6 (review, produce findings), with the
+  rules from 2a already loaded
 - `code-review` does NOT handle output — it returns structured findings
-- Pass PR title as branch objective for scope classification
 
 **Do NOT** re-implement review logic. `code-review` is the analysis engine.
 
@@ -173,6 +196,8 @@ hook watches for to notify. A terminal-only report leaves no trace anywhere.
 | Skipping fetch when already on PR branch | Always fetch latest PR ref and reset, even if already on branch |
 | Skipping checkout, reviewing with API diff only | Always attempt local checkout first for full file access |
 | Re-implementing review logic | Delegate entirely to code-review |
+| Reading the changed files or a dependency PR before code-review's rules are loaded | Run 2a first; the file reads belong to Step 3 |
+| Listing a skill as applied in the review body when its SKILL.md was never read | List only the skills from 2a's output plus those activated in Step 3 |
 | Bundling multiple findings in one comment | One finding = one comment |
 | Asking user whether to submit | Do NOT ask. Just notify and stop. |
 | Skipping post-review-validation | Always validate before posting |
