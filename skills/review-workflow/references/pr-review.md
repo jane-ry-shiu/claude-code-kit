@@ -19,8 +19,9 @@ These rules are non-negotiable for ALL PR reviews.
    - Do NOT ask "要不要 submit?"
    - Do NOT offer to submit.
 
-3. After creating the pending review, notify the user with the comment count and PR
-   link. A zero-finding review is still created and still notified — see Early Exit.
+3. After creating the pending review, notify the user with the comment count, the PR
+   link and the PR's purpose. A zero-finding review is still created and still notified —
+   see Early Exit.
    That is the terminal state. Stop.
 </HARD-GATE>
 
@@ -132,6 +133,13 @@ Auto-fix or discard as defined in post-review-validation.
 
 ## Step 6: Notify User
 
+Every notification ends with the `這個 PR 的目的` line. `{pr_purpose}` is one short sentence
+in 繁體中文, in the form 「讓{誰}{得到什麼}」: who benefits and what they get once the PR
+ships, worked out from the PR description and the diff. Example:
+`讓設計師在 Storybook 上不用自己指定比較基準，就能直接看到這條 branch 改了哪些畫面。`
+It lives in this notification only; the pending review body and comments keep the layouts
+defined in Step 5 and Early Exit.
+
 Output notification:
 
 ```
@@ -145,6 +153,8 @@ Pending review 已建立，共 {N} 筆 comments。
 
 請到 GitHub 預覽並 submit：
 https://github.com/{owner}/{repo}/pull/{pr_number}
+
+這個 PR 的目的：{pr_purpose}
 ```
 
 When all comments pass with zero fixes/discards/flags, simplify:
@@ -153,6 +163,8 @@ When all comments pass with zero fixes/discards/flags, simplify:
 Pending review 已建立，共 {N} 筆 comments。
 請到 GitHub 預覽並 submit：
 https://github.com/{owner}/{repo}/pull/{pr_number}
+
+這個 PR 的目的：{pr_purpose}
 ```
 
 **This is the terminal state. STOP here.**
@@ -178,7 +190,11 @@ lands on the PR — as a body with no pins, for the user to approve.
    ```
    Review 完成，未發現問題。已建立 pending review（無 comment），請到 GitHub approve：
    https://github.com/{owner}/{repo}/pull/{pr_number}
+
+   這個 PR 的目的：{pr_purpose}
    ```
+
+   `{pr_purpose}` is defined in Step 6.
 
 **Why not just report to the terminal:** the review is still waiting on a decision only the
 user can make, and a pending review is what makes that visible on the PR — and what the Stop
