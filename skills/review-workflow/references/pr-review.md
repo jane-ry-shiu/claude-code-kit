@@ -73,18 +73,38 @@ never read stays unread without anything noticing.
 
 **Determine remote:** PR refs (`pull/N/head`) live on the repo where the PR was opened (base repo). Identify the local remote pointing to `{base.repo.full_name}` from Step 1 metadata — `origin`, since branches and PRs both live in the org repo.
 
-1. Check current branch: `git branch --show-current`
-2. If already on PR branch:
+**Where to check out:** the directory this session started in is not automatically the place. Other
+sessions may be working in it, and `pr-{N}` may already be checked out in another worktree. Pick the
+review directory `W` from what the repository shows now, with this probe for "is a checkout free":
+
+```bash
+# Empty output = free. Otherwise the JSON says who or what holds it: another Claude session started
+# there, a dev server running from there, a rebase/merge in progress, or uncommitted tracked changes.
+probe() { jq -nc --arg d "$1" '{tool_input:{command:"git reset --hard"},cwd:$d}' \
+  | ~/.claude/hooks/guard-shared-checkout.py; }
+```
+
+If `~/.claude/hooks/guard-shared-checkout.py` does not exist, treat every existing checkout as not free.
+
+1. `git worktree list` — find whether `pr-{N}` is checked out, and in which worktree.
+2. Choose `W` by the first row that matches:
+
+   | What `git worktree list` and `probe` show | `W` |
+   |---|---|
+   | `pr-{N}` checked out in worktree X, `probe X` empty | X |
+   | `pr-{N}` checked out in worktree X, `probe X` not empty | none — stop, tell the user what the probe reported, and wait |
+   | `pr-{N}` checked out nowhere; some worktree Y has `probe Y` empty | Y — prefer one whose current branch is an earlier `pr-*` |
+   | `pr-{N}` checked out nowhere; every probe is non-empty | a new worktree: `git worktree add <scratchpad>/pr-{N} --detach` |
+
+3. Bring `W` to the PR head:
    ```bash
-   git fetch {remote} pull/{N}/head
-   git reset --hard FETCH_HEAD
+   git -C W fetch {remote} pull/{N}/head
+   git -C W checkout -B pr-{N} FETCH_HEAD
    ```
-3. Otherwise:
-   ```bash
-   git fetch {remote} pull/{N}/head:pr-{N}
-   git checkout pr-{N}
-   ```
-4. If fetch fails (permissions, network), fall back to API-only mode (diff from Step 1)
+4. Tell the user in one line which directory the review reads from. From here on every command
+   and file read uses `W`'s absolute path or `git -C W` — a `cd` into `W` does not persist between
+   tool calls — and Step 3 passes `W` to `code-review` as the root it reads the changed files from.
+5. If fetch fails (permissions, network), fall back to API-only mode (diff from Step 1).
 
 ## Step 3: Run code-review
 
@@ -209,7 +229,9 @@ hook watches for to notify. A terminal-only report leaves no trace anywhere.
 |---------|-----|
 | Submitting the pending review | NEVER submit. User does this manually. |
 | Outputting findings to terminal instead of PR comments | HARD-GATE: findings MUST be posted as pending comments |
-| Skipping fetch when already on PR branch | Always fetch latest PR ref and reset, even if already on branch |
+| Skipping fetch when already on PR branch | Always fetch the latest PR ref into `W`, even if `W` is already on `pr-{N}` |
+| Checking out in the directory the session started in because that is where commands run | Choose `W` from `git worktree list` and `probe`; the starting directory is one candidate, not the default |
+| Going ahead in a checkout whose probe reported someone | Stop and tell the user; another session's files would move under it |
 | Skipping checkout, reviewing with API diff only | Always attempt local checkout first for full file access |
 | Re-implementing review logic | Delegate entirely to code-review |
 | Reading the changed files or a dependency PR before code-review's rules are loaded | Run 2a first; the file reads belong to Step 3 |
