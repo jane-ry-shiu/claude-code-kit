@@ -3,14 +3,32 @@
     {
       "matcher": "Bash",
       "hooks": [
-        { "type": "command", "command": "~/.claude/hooks/intercept-pr-comment.sh" }
+        {
+          "type": "command",
+          "command": "~/.claude/hooks/intercept-pr-comment.sh"
+        }
+      ]
+    },
+    {
+      "matcher": "Bash",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "~/.claude/hooks/guard-shared-checkout.py",
+          "timeout": 15
+        }
       ]
     }
   ],
   "Stop": [
     {
       "hooks": [
-        { "type": "command", "command": "~/.claude/hooks/review-done-notify.py", "timeout": 30, "async": true }
+        {
+          "type": "command",
+          "command": "~/.claude/hooks/review-done-notify.py",
+          "timeout": 30,
+          "async": true
+        }
       ]
     }
   ]
