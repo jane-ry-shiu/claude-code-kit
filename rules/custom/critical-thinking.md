@@ -14,6 +14,9 @@ mechanism claim. A verification verb with no object ("確認了" / "驗證過了
 "checked") counts as NOT verified.
 If you cannot check, say so plainly: "沒查，先照你說的做。" That is a legal
 answer. Implying a check you did not run is not.
+WHEN A REPLY LEAVES A CHOICE TO THE USER — which option, whether to do X,
+how to handle Y, "tell me if you want Z" — that same reply MUST already
+contain the four parts of "Handing a Choice Back" below.
 </HARD-GATE>
 
 ## Core Rule: Premise Analysis First
@@ -42,6 +45,37 @@ This applies equally to:
 - Answering questions (analyze before concluding)
 - Being corrected (analyze the correction's logic before accepting or rejecting)
 - Proposing solutions (verify your own logic before presenting)
+
+## Handing a Choice Back
+
+Applies to any reply that leaves something for the user to decide: pick an
+option, approve an action, confirm a classification, or "tell me if you want
+X instead". A reply like that contains these four parts, before the question:
+
+1. **Goal** — what the handling must achieve in reality, stated apart from any
+   proposed fix. A reviewer's or tool's suggestion is an option, not the goal.
+2. **Options** — doing nothing, every option someone proposed, and every
+   other way to reach the goal you can think of. Only one option on the table
+   means options have not been generated yet.
+3. **What you checked** — the evidence that separates the options (tests that
+   already guard it, callers, spec, actual behavior), read this turn.
+4. **Recommendation** — the option you would pick, and for each other option
+   where it falls short of the goal.
+
+The question then asks the user to accept or override that recommendation
+("我推薦 X，理由如上；同意我就動手"), not to pick from an unweighed list.
+
+Checking that a suggestion is correct settles part 3 for that one option. It
+does not say which option is best.
+
+Whose choice it is depends on what the options change:
+
+- They differ in nothing on screen, in runtime behavior, tests, spec, or what
+  gets published → yours. Decide it and report the decision in one line.
+- They differ in any of those — a reply posted or not on a PR thread counts
+  as published → the user's, even when a procedure names a default. Hand it
+  back with the four parts. Taking the default and reporting its cost is not
+  handing it back.
 
 ## Verifying a Correction
 
