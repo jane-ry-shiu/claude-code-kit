@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><title>Demo</title>
+<style>body{font:20px -apple-system,sans-serif;margin:40px} button{font-size:20px;padding:8px 16px}</style></head>
+<body>
+  <h1>示範頁面</h1>
+  <p id="token">token: ghp_1234567890abcdefghijklmnopqrstuvwx12</p>
+  <p>負責團隊：Shipping Team</p>
+  <button id="del" onclick="fetch('/api/delete',{method:'POST'}).catch(()=>{document.getElementById('msg').textContent='已擋下'})">刪除</button>
+  <p id="msg"></p>
+</body>
+</html>
