@@ -74,12 +74,19 @@ export async function draw({ jpg, w, h, spec, cssW, P, RP, L }) {
   }
   g.font = `500 ${L.size * sc}px -apple-system, 'PingFang TC', system-ui, sans-serif`;
   g.textBaseline = 'middle';
+  // A caption with '\n' is one box holding one line per segment; it grows upward, and a key label sits above it.
+  const lineH = L.size * 1.4 * sc;
+  const boxH = (text) => L.height * sc + (text.split('\n').length - 1) * lineH;
+  const mark = spec.labels.find((l) => l.kind !== 'key');
+  const capH = mark ? boxH(mark.text) : L.height * sc;
   for (const l of spec.labels) {
-    const tw = g.measureText(l.text).width, padX = L.padX * sc, hgt = L.height * sc;
-    const top = H - hgt - L.bottom * sc - (l.kind === 'key' ? (L.height + L.gap) * sc : 0), left = (W - tw) / 2 - padX;
+    const rows = l.text.split('\n');
+    const tw = Math.max(...rows.map((r) => g.measureText(r).width)), padX = L.padX * sc, hgt = boxH(l.text);
+    const top = H - L.bottom * sc - (l.kind === 'key' ? capH + L.gap * sc + hgt : hgt), left = (W - tw) / 2 - padX;
     g.fillStyle = L.bg;
     g.beginPath(); g.roundRect(left, top, tw + 2 * padX, hgt, 8 * sc); g.fill();
-    g.fillStyle = '#fff'; g.fillText(l.text, left + padX, top + hgt / 2);
+    g.fillStyle = '#fff';
+    rows.forEach((r, i) => g.fillText(r, left + padX, top + (L.height * sc) / 2 + i * lineH));
   }
   const blob = await cv.convertToBlob(img ? { type: 'image/jpeg', quality: 0.92 } : { type: 'image/png' });
   const buf = new Uint8Array(await blob.arrayBuffer());
