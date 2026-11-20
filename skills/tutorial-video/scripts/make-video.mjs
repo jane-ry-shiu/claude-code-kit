@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Usage: PLAYWRIGHT_CORE=<dir with node_modules/playwright-core> node make-video.mjs <scene file> <out dir>
+// Usage: PLAYWRIGHT_CORE=<dir with node_modules/playwright-core> node make-video.mjs <scene file> <out dir> [--voice mac]
 // Voices every cue, records the scenes headless through os-screen-capture's harness, mixes the voice in at the times
 // the subtitles appeared, and writes <out>/<name>.mp4, cues.json, report.json and frames/scene-<i>.png.
 import { spawn, execFile, execFileSync } from 'node:child_process';
@@ -10,7 +10,8 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { loadScenes, buildCues } from './lib/scenes.mjs';
 import { spokenText } from './lib/cues.mjs';
-import { voiceCue, durationOf, DEFAULT_VOICE } from './lib/voice.mjs';
+import { voiceCue, durationOf, chooseVoice, describeVoice, isAzureVoice } from './lib/voice.mjs';
+import { azureCredentials } from './lib/azure-voice.mjs';
 import { holdSeconds } from './lib/guard.mjs';
 import { setupStepSource, recordStepSource } from './lib/steps.mjs';
 import { mixArgs, markTimes } from './lib/mix.mjs';
@@ -101,15 +102,35 @@ async function recordWithHarness(sf, cues, out) {
   }
 }
 
-export async function makeVideo(scenePath, outDir) {
+/** `<scene file> <out dir> [--voice mac]` in any order of flag; null when the arguments do not fit. */
+export function parseCli(argv) {
+  const positional = [];
+  let voice;
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i];
+    if (a === '--voice') {
+      if (i + 1 >= argv.length) return null;
+      voice = argv[i += 1];
+    } else if (a.startsWith('--voice=')) voice = a.slice('--voice='.length);
+    else if (a.startsWith('-')) return null;
+    else positional.push(a);
+  }
+  if (positional.length !== 2) return null;
+  return { scenePath: positional[0], outDir: positional[1], voice };
+}
+
+export async function makeVideo(scenePath, outDir, { voice: voiceOverride } = {}) {
   const sf = await loadScenes(scenePath);
+  const voice = chooseVoice(sf.voice, voiceOverride);
+  const azure = isAzureVoice(voice) ? azureCredentials() : undefined;
   const out = resolve(outDir);
   const voiceDir = join(out, 'voice');
   mkdirSync(voiceDir, { recursive: true });
+  console.error('voice', describeVoice(voice));
   const cues = buildCues(sf);
   for (const [i, c] of cues.entries()) {
     c.wav = join(voiceDir, `c${String(i).padStart(3, '0')}.wav`);
-    c.dur = await voiceCue(spokenText(c.text), c.wav, sf.voice || DEFAULT_VOICE);
+    c.dur = await voiceCue(spokenText(c.text), c.wav, voice, { azure, cacheDir: join(voiceDir, 'cache') });
     c.hold = holdSeconds(c.dur, i === cues.length - 1 || cues[i + 1].scene !== c.scene);
   }
 
@@ -118,7 +139,8 @@ export async function makeVideo(scenePath, outDir) {
   const times = markTimes(result.rec);
   if (times.length !== cues.length) throw new Error(`recorder logged ${times.length} subtitles for ${cues.length} cues`);
   const mp4 = join(out, `${sf.name}.mp4`);
-  await run('ffmpeg', mixArgs(result.rec.mp4, cues.map((c, i) => ({ wav: c.wav, t: times[i] })), mp4));
+  const recordedDuration = await streamDuration(result.rec.mp4, 'v:0');
+  await run('ffmpeg', mixArgs(result.rec.mp4, cues.map((c, i) => ({ wav: c.wav, t: times[i] })), mp4, recordedDuration));
 
   const frames = join(out, 'frames');
   mkdirSync(frames, { recursive: true });
@@ -132,6 +154,7 @@ export async function makeVideo(scenePath, outDir) {
     mp4,
     duration: await streamDuration(mp4, 'v:0'),
     audioDuration: await streamDuration(mp4, 'a:0'),
+    voice: describeVoice(voice),
     voiceTotal: +(await Promise.all(cues.map((c) => durationOf(c.wav)))).reduce((a, b) => a + b, 0).toFixed(2),
     guardHosts: result.guardHosts,
     guardLog: result.guardLog,
@@ -142,12 +165,12 @@ export async function makeVideo(scenePath, outDir) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const [scenePath, outDir] = process.argv.slice(2);
-  if (!scenePath || !outDir) {
-    console.error('usage: PLAYWRIGHT_CORE=<dir> node make-video.mjs <scene file> <out dir>');
+  const cli = parseCli(process.argv.slice(2));
+  if (!cli) {
+    console.error('usage: PLAYWRIGHT_CORE=<dir> node make-video.mjs <scene file> <out dir> [--voice mac]');
     process.exit(2);
   }
-  makeVideo(scenePath, outDir).then(
+  makeVideo(cli.scenePath, cli.outDir, { voice: cli.voice }).then(
     (r) => { console.log(JSON.stringify(r, null, 1)); },
     (e) => { console.error(e.message); process.exit(1); },
   );

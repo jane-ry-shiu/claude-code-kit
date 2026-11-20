@@ -49,10 +49,29 @@ test('buildCues attaches a sentence action to its first cue only', () => {
   assert.deepEqual(cues.at(-1), { scene: 0, sentence: 1, text: '下一句' });
 });
 
+
 test('an action that writes its own subtitle is rejected before recording', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'tv-scenes-'));
   const file = join(dir, 'mark.scenes.mjs');
   writeFileSync(file, `export default { name: 'mark', site: { baseUrl: 'http://x' }, scenes: [{ title: 't', sentences: [
     { say: 'ok', do: async (page, h) => { h.mark('extra'); } } ] }] };`);
   await assert.rejects(loadScenes(file), /scene 0 sentence 0: do must not call h\.mark/);
+});
+
+const writeScene = (voiceSource) => {
+  const file = join(mkdtempSync(join(tmpdir(), 'tv-scenes-')), 'v.scenes.mjs');
+  writeFileSync(file, `export default { name: 'v', site: { baseUrl: 'http://x' }, voice: ${voiceSource}, scenes: [{ title: 't', sentences: [{ say: 'ok' }] }] };`);
+  return file;
+};
+
+test('an azure voice with a voice name is accepted', async () => {
+  const sf = await loadScenes(writeScene(`{ engine: 'azure', name: 'zh-TW-HsiaoChenNeural', rate: '+10%' }`));
+  assert.deepEqual(sf.voice, { engine: 'azure', name: 'zh-TW-HsiaoChenNeural', rate: '+10%' });
+});
+
+test('a voice that is neither azure nor a command is rejected', async () => {
+  await assert.rejects(loadScenes(writeScene(`{ engine: 'polly', name: 'x' }`)), /voice must be \{ engine: 'azure', name \} or \{ command: \[\.\.\.\] \}/);
+  await assert.rejects(loadScenes(writeScene(`{ engine: 'azure' }`)), /voice\.name must be an Azure voice short name/);
+  await assert.rejects(loadScenes(writeScene(`{ engine: 'azure', name: 'zh-TW-HsiaoChenNeural', rate: 10 }`)), /voice\.rate must be a string/);
+  await assert.rejects(loadScenes(writeScene(`{ command: ['say', 'hi'] }`)), /voice\.command must be an array of strings that writes to \{out\}/);
 });

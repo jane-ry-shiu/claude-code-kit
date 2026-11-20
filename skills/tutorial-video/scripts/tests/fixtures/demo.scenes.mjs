@@ -1,5 +1,6 @@
 const mode = process.env.DEMO_MODE || 'ok';
 const sine = { command: ['ffmpeg', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'sine=d=1.2', '{out}.aiff'] };
+const azure = { engine: 'azure', name: 'zh-TW-HsiaoChenNeural' };
 
 export default {
   name: 'demo-video',
@@ -12,7 +13,7 @@ export default {
   start: '/',
   viewport: '1280x720',
   scale: 1,
-  voice: sine,
+  voice: process.env.DEMO_VOICE === 'azure' ? azure : sine,
   scenes: [
     {
       title: '示範',

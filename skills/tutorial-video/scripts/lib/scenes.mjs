@@ -4,12 +4,31 @@ import { splitCues } from './cues.mjs';
 
 const isExpression = (src) => { try { new vm.Script(`(${src})`); return true; } catch { return false; } };
 
+const AZURE_VOICE_NAME = /^[a-z]{2,3}-[A-Za-z]{2,4}-\S+$/;
+
+function voiceProblems(voice) {
+  if (voice === undefined) return [];
+  if (voice?.engine === 'azure') {
+    const p = [];
+    if (typeof voice.name !== 'string' || !AZURE_VOICE_NAME.test(voice.name)) p.push("voice.name must be an Azure voice short name, e.g. 'zh-TW-HsiaoChenNeural'");
+    if (voice.rate !== undefined && typeof voice.rate !== 'string') p.push("voice.rate must be a string, e.g. '+10%'");
+    return p;
+  }
+  if (voice && 'command' in voice && voice.engine === undefined) {
+    const ok = Array.isArray(voice.command) && voice.command.length > 1 && voice.command.every((a) => typeof a === 'string')
+      && voice.command.some((a) => a.startsWith('{out}'));
+    return ok ? [] : ['voice.command must be an array of strings that writes to {out} (e.g. "{out}.aiff")'];
+  }
+  return ["voice must be { engine: 'azure', name } or { command: [...] }"];
+}
+
 function problemsOf(sf) {
   const p = [];
   if (!sf || typeof sf !== 'object') return ['the file must `export default` a scene object'];
   if (!/^[a-z0-9][a-z0-9-]*$/.test(sf.name || '')) p.push('name is missing or not lower-case-with-dashes');
   if (!sf.site?.baseUrl) p.push('site.baseUrl is missing');
   if (!Array.isArray(sf.scenes) || !sf.scenes.length) p.push('no scenes');
+  p.push(...voiceProblems(sf.voice));
   (sf.scenes || []).forEach((scene, i) => {
     if (!Array.isArray(scene.sentences) || !scene.sentences.length) p.push(`scene ${i}: no sentences`);
     (scene.sentences || []).forEach((s, j) => {

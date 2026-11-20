@@ -17,7 +17,8 @@ a subtitle; write the sentence the viewer should hear.
 
 ## Requirements
 
-Node 20+, Google Chrome, ffmpeg/ffprobe, macOS `say` (default voice Meijia, zh_TW), and `PLAYWRIGHT_CORE` set to a
+Node 20+, Google Chrome, ffmpeg/ffprobe, macOS `say` (default voice Meijia, zh_TW; an Azure neural voice is optional,
+see [Azure voice](#azure-voice)), and `PLAYWRIGHT_CORE` set to a
 directory whose `node_modules` has `playwright-core` — any project checkout with Playwright installed; find one with
 `find ~ -maxdepth 5 -type d -path '*/node_modules/playwright-core' 2>/dev/null | head -1` and use the directory above
 `node_modules`. The recorder is the `os-screen-capture` skill next to this one.
@@ -32,14 +33,16 @@ directory whose `node_modules` has `playwright-core` — any project checkout wi
    out, theme or settings changes.
 3. **Run it** from this skill's directory:
    `PLAYWRIGHT_CORE=<dir> node scripts/make-video.mjs <scene file> <out dir>` (out dir in scratch, never a tracked
-   path). The run lasts as long as the video plus a few minutes, so start it as a background command and wait for it
+   path). Voiced sentences are kept in `<out dir>/voice/cache`, keyed by voice and text: rerunning into the same out
+   dir voices only sentences that changed. Delete that folder to voice everything again (for example after editing a
+   custom voice command's script). The run lasts as long as the video plus a few minutes, so start it as a background command and wait for it
    to finish; a foreground command's timeout would kill it halfway. It voices, records, mixes, and writes
    `<name>.mp4`, `cues.json`, `report.json`, `frames/scene-<i>.png`.
 4. **Check before handing over** — every item, every time:
    - View every `frames/scene-*.png` (taken 1.5 s after each scene's first subtitle): the right page, pointer on target,
      subtitle readable and inside the frame. To check another moment, take a frame at a cue's `start` from `cues.json`:
      `ffmpeg -ss <start + 1> -i <mp4> -frames:v 1 -update 1 check.png`.
-   - `report.json`: `secretHits` all empty; `duration` and `audioDuration` within 0.3 s; `guardHosts` names every
+   - `report.json`: `voice` is the voice the video was meant to have; `secretHits` all empty; `duration` and `audioDuration` within 0.3 s; `guardHosts` names every
      host whose writes were blocked (add an API host the site calls with `site.guardHosts`); `guardLog` lists writes the
      page tried and the guard blocked. Leave a blocked request blocked when the frames look right (view tracking,
      analytics). Add its path to `site.allowPost` only when it is a read the page needs and the frames show missing
@@ -54,6 +57,22 @@ directory whose `node_modules` has `playwright-core` — any project checkout wi
 into a throwaway profile that is deleted when the run ends, also on failure. The agent never types a password. When
 the run fails with `no session for <host>: sign in …`, ask the owner to sign in to that site in the shared Chrome,
 then rerun. Sites without sign-in leave `cookieSource` out.
+
+## Azure voice
+
+`voice: { engine: 'azure', name: 'zh-TW-HsiaoChenNeural' }` in the scene file voices the whole video with that Azure
+neural voice (`rate: '+10%'` speeds it up). Each person uses their own Speech resource (Azure portal → Speech service,
+pricing tier Free F0 = 500 000 characters a month; a 2-minute video is about 1 000). Store its key and region once:
+
+```bash
+~/claude-code-kit/bin/kit-secret set AZURE_SPEECH_KEY      # KEY 1 from Keys and Endpoint
+~/claude-code-kit/bin/kit-secret set AZURE_SPEECH_REGION   # e.g. eastasia
+```
+
+Without claude-code-kit, export both names in the shell instead. Never put the key in a scene file or a message.
+
+Any Azure failure (no key, wrong key or region, quota used up, network) stops the run before recording and says why.
+It never switches voice by itself: a series keeps one voice. To voice with Meijia anyway, rerun with `--voice mac`.
 
 ## What is masked
 
@@ -75,6 +94,8 @@ whose purpose is to display a secret (token or key management) unless the owner 
 
 | Symptom | Fix |
 |---|---|
+| `no Azure Speech AZURE_SPEECH_KEY` / `Azure rejected the key or region` | Store or fix the key and region ([Azure voice](#azure-voice)), or rerun with `--voice mac` |
+| `Azure quota or rate limit reached` | Free tier: 20 requests a minute and a monthly allowance. Rerun into the same out dir (voiced sentences are cached); failing again means the month is used up: wait, or rerun with `--voice mac` |
 | `do must be an arrow function` | Actions are serialized; write `do: async (page, h) => { … }`, use only `page` and `h` |
 | `scene X sentence Y: … Timeout 30000ms exceeded` on a gesture that only points | Give pointing targets `{ timeout: 5000 }` and `.catch(() => null)`; keep the default wait only for clicks the next sentence depends on |
 | A 「按鍵：…」 label appears under the subtitle | `h.key` labels keys; press keys with `page.keyboard.press` |
