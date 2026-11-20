@@ -16,12 +16,16 @@ test('a sentence that fits two lines stays one cue of two lines', () => {
   const cues = splitCues(s);
   assert.equal(cues.length, 1);
   assert.equal(lines(cues[0]).length, 2);
-  for (const l of lines(cues[0])) assert.ok(textWidth(l) <= 22, l);
+  for (const l of lines(cues[0])) assert.ok(textWidth(l) <= 28, l);
   assert.equal(strip(cues.join('')), strip(s));
 });
 
 test('a short sentence is one single-line cue without trailing punctuation', () => {
   assert.deepEqual(splitCues('這裡改成 API。'), ['這裡改成 API']);
+});
+
+test('a line holds up to 28 characters', () => {
+  assert.deepEqual(splitCues('改完之後按下送出就可以了，這裡只是示範，所以不會真的送出。'), ['改完之後按下送出就可以了，這裡只是示範，所以不會真的送出']);
 });
 
 test('a long sentence becomes several cues of at most two lines each', () => {
@@ -30,7 +34,7 @@ test('a long sentence becomes several cues of at most two lines each', () => {
   assert.ok(cues.length >= 2);
   for (const c of cues) {
     assert.ok(lines(c).length <= 2, c);
-    for (const l of lines(c)) assert.ok(textWidth(l) <= 22, l);
+    for (const l of lines(c)) assert.ok(textWidth(l) <= 28, l);
   }
   assert.equal(strip(cues.join('')), strip(s));
 });

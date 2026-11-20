@@ -12,7 +12,7 @@ sentence and the subtitle shows exactly what is being said. Every cue is voiced 
 subtitle for its audio length, so speech and subtitles never drift. Recording is headless: the owner's screen and mouse
 are never touched.
 
-**Subtitle = speech.** A cue is one or two lines (about 22 characters per line). Never put step numbers or headings in
+**Subtitle = speech.** A cue is one or two lines (about 28 characters per line). Never put step numbers or headings in
 a subtitle; write the sentence the viewer should hear.
 
 ## Requirements

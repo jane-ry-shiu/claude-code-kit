@@ -60,7 +60,7 @@ function joinSpoken(raws) {
  * `spoken` is what the voice reads for that cue: the same stretch of the sentence with its punctuation kept, so the
  * voice still pauses where a line break dropped a comma.
  */
-export function splitCueParts(sentence, max = 22, lines = 2) {
+export function splitCueParts(sentence, max = 28, lines = 2) {
   if (!cleanLine(sentence).replace(/[，、；：。！？]/g, '').trim()) throw new Error('narration sentence is empty');
   const pieces = clausesOf(sentence).flatMap((c) => chunkClause(c, max));
   const packed = [];
@@ -79,6 +79,6 @@ export function splitCueParts(sentence, max = 22, lines = 2) {
 }
 
 /** The caption text of each cue `splitCueParts` makes. */
-export function splitCues(sentence, max = 22, lines = 2) {
+export function splitCues(sentence, max = 28, lines = 2) {
   return splitCueParts(sentence, max, lines).map((p) => p.text);
 }
