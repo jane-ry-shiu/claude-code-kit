@@ -99,6 +99,7 @@ whose purpose is to display a secret (token or key management) unless the owner 
 | `do must be an arrow function` | Actions are serialized; write `do: async (page, h) => { … }`, use only `page` and `h` |
 | `scene X sentence Y: … Timeout 30000ms exceeded` on a gesture that only points | Give pointing targets `{ timeout: 5000 }` and `.catch(() => null)`; keep the default wait only for clicks the next sentence depends on |
 | A 「按鍵：…」 label appears under the subtitle | `h.key` labels keys; press keys with `page.keyboard.press` |
+| `locator resolved to hidden <a …>` | The page has a hidden copy first (GitHub file lists do); select the visible one: `page.locator('a[title="README.md"] >> visible=true')` |
 | Pointer lands in the wrong place | `h.glide(x, y)` and `{ x, y }` targets are CSS px of the viewport (default 1600×900), not video pixels; prefer selectors |
 | A subtitle runs long or splits oddly | Shorten the sentence or add a comma where the break should go |
 | Voice and pointer out of step | The action is in the wrong sentence; move it |

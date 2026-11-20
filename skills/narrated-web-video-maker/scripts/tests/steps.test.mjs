@@ -105,7 +105,11 @@ test('setup step without a cookie source skips sign-in', async () => {
 
 const fakeRun = () => {
   const log = [];
-  const page = { goto: async (u) => log.push(['goto', u]), evaluate: async () => 'page text token: 9f8e7d6c5b4a39281706f5e4d3c2b1a0' };
+  const page = {
+    goto: async (u, o) => log.push(['goto', u, o && o.waitUntil]),
+    waitForLoadState: async (state, o) => log.push(['wait', state, o && o.timeout]),
+    evaluate: async () => 'page text token: 9f8e7d6c5b4a39281706f5e4d3c2b1a0',
+  };
   const h = {
     state: { guardLog: ['DELETE /x'] },
     sleep: async (ms) => log.push(['sleep', Math.round(ms / 100) / 10]),
@@ -135,6 +139,23 @@ test('record step marks each cue, runs a sentence action once, holds, and scans 
   assert.equal(out.secretHits.length, 2);
   assert.deepEqual(plain(out.secretHits[0]), { scene: 0, hits: ['9f8e7d6c5b4a39281706f5e4d3c2b1a0'] });
   assert.deepEqual(plain(out.guardLog), ['DELETE /x']);
+  assert.equal(out.rec.mp4, 'v.mp4');
+});
+
+test('record step waits for the start page to load, then at most 10 s for it to go quiet', async () => {
+  const step = vm.runInNewContext(`(${recordStepSource(plan)})`, { Date });
+  const { log, page, h } = fakeRun();
+  await step(page, {}, h);
+  const before = log.slice(0, log.findIndex((l) => l[0] === 'recStart'));
+  assert.deepEqual(before.filter((l) => l[0] !== 'sleep'), [['goto', 'https://x.example.com/', 'load'], ['wait', 'networkidle', 10000]]);
+});
+
+test('record step still records when the start page never goes quiet', async () => {
+  const step = vm.runInNewContext(`(${recordStepSource(plan)})`, { Date });
+  const { log, page, h } = fakeRun();
+  page.waitForLoadState = async () => { throw new Error('Timeout 10000ms exceeded.'); };
+  const out = await step(page, {}, h);
+  assert.equal(log.filter((l) => l[0] === 'recStart').length, 1);
   assert.equal(out.rec.mp4, 'v.mp4');
 });
 

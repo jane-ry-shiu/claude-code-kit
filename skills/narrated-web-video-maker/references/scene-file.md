@@ -30,7 +30,8 @@ An ES module whose default export describes one video. `make-video.mjs` checks i
   narration; use it only when the key itself is the lesson.)
 - `page.keyboard.type('shipping', { delay: 150 })` — type visibly.
 - `page.evaluate(() => window.scrollTo({ top: 800, behavior: 'smooth' }))` — scroll.
-- `page.waitForLoadState('networkidle')` after a click that navigates.
+- `page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => null)` after a click that navigates. The short
+  timeout matters: some signed-in sites (GitHub) never go quiet, and the next subtitle waits for the action to end.
 
 ## Example
 

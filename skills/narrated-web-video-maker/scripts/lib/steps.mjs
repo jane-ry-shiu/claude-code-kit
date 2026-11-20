@@ -37,6 +37,9 @@ export function setupStepSource(site) {
 }`;
 }
 
+// Some signed-in sites (GitHub) keep one request open forever, so the start page may never go quiet.
+export const START_QUIET_MS = 10000;
+
 /**
  * Step that records the whole video: one mark per cue, the sentence's action on its first cue, a hold until the
  * cue's time is up, and a secret scan of the page at each scene end. The recording is always stopped.
@@ -48,7 +51,8 @@ export function recordStepSource(plan) {
   const plan = ${JSON.stringify({ name: plan.name, url: plan.baseUrl + (plan.start || '/'), secretPatterns: plan.secretPatterns || [], cues })};
   const actions = [${actions.join(',\n')}];
   const scan = ${scanSecrets.toString()};
-  await page.goto(plan.url, { waitUntil: 'networkidle' });
+  await page.goto(plan.url, { waitUntil: 'load' });
+  await page.waitForLoadState('networkidle', { timeout: ${START_QUIET_MS} }).catch(() => null);
   await h.sleep(1500);
   await h.recStart(plan.name);
   const secretHits = [];
