@@ -86,7 +86,7 @@ whose purpose is to display a secret (token or key management) unless the owner 
 | Do | Because |
 |---|---|
 | One idea per sentence, 繁體中文, UI labels exactly as on screen (「Kind」, 「Filter」) | The viewer matches words to the screen |
-| Write English the way it is read: `shipping backend API`, not `shipping-backend-api` | Subtitle = speech; the voice reads hyphens and code oddly |
+| Write English the way it is read, split into words with capitals: `shipping backend API` not `shipping-backend-api`, `Open API` not `openapi`, `Read Me` not `README` | Subtitle = speech; the voice reads hyphens, run-together words and all-caps names oddly (owner listened: `Open API` and `Read Me` sound right) |
 | Keep the action inside the sentence that describes it | The action starts with that sentence's first cue |
 | Let long pages scroll smoothly (`page.evaluate` + `scrollTo({ behavior: 'smooth' })`) | A jump hides where the content is |
 
