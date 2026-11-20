@@ -8,7 +8,7 @@ import { azureSynthesize } from './azure-voice.mjs';
 const run = promisify(execFile);
 
 /** A voice engine is a command; `{text}` is the cue as spoken, `{out}` the output path without extension. */
-export const DEFAULT_VOICE = Object.freeze({ command: ['say', '-v', 'Meijia', '-r', '185', '-o', '{out}.aiff', '{text}'] });
+export const DEFAULT_VOICE = Object.freeze({ command: ['say', '-v', 'Meijia', '-r', '200', '-o', '{out}.aiff', '{text}'] });
 
 export const isAzureVoice = (voice) => voice?.engine === 'azure';
 

@@ -1,6 +1,6 @@
 import vm from 'node:vm';
 import { pathToFileURL } from 'node:url';
-import { splitCues } from './cues.mjs';
+import { splitCueParts } from './cues.mjs';
 
 const isExpression = (src) => { try { new vm.Script(`(${src})`); return true; } catch { return false; } };
 
@@ -54,11 +54,20 @@ export async function loadScenes(path) {
   };
 }
 
-/** Cues in play order; a sentence's action (as source text) rides on its first cue. */
+function pauseAfter(isLastInSentence, isLastInScene) {
+  if (isLastInScene) return 'scene';
+  return isLastInSentence ? 'sentence' : 'clause';
+}
+
+/** Cues in play order, each with the pause after it; a sentence's action (as source text) rides on its first cue. */
 export function buildCues(sf) {
-  return sf.scenes.flatMap((scene, i) => scene.sentences.flatMap((s, j) => splitCues(s.say).map((text, k) => {
-    const cue = { scene: i, sentence: j, text };
-    if (k === 0 && s.do) cue.action = s.do.toString();
-    return cue;
-  })));
+  return sf.scenes.flatMap((scene, i) => scene.sentences.flatMap((s, j, sentences) => {
+    const parts = splitCueParts(s.say);
+    return parts.map(({ text, spoken }, k) => {
+      const isLastInSentence = k === parts.length - 1;
+      const cue = { scene: i, sentence: j, text, spoken, pause: pauseAfter(isLastInSentence, isLastInSentence && j === sentences.length - 1) };
+      if (k === 0 && s.do) cue.action = s.do.toString();
+      return cue;
+    });
+  }));
 }

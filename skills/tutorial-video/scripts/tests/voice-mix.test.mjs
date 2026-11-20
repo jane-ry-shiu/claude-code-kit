@@ -23,7 +23,7 @@ test('voiceCue fails loudly when the engine fails', async () => {
 });
 
 test('the default voice is Meijia', () => {
-  assert.deepEqual(DEFAULT_VOICE.command.slice(0, 5), ['say', '-v', 'Meijia', '-r', '185']);
+  assert.deepEqual(DEFAULT_VOICE.command.slice(0, 5), ['say', '-v', 'Meijia', '-r', '200']);
 });
 
 test('mixArgs places each clip at its mark time plus 0.15 s and keeps the video stream', () => {

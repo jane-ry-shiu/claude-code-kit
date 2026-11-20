@@ -5,7 +5,11 @@ export function isAllowedRequest(method, pathname, allowPost) {
   return allowPost.some((p) => new RegExp(p).test(pathname));
 }
 
-/** Seconds a cue stays on screen: its audio plus a gap, longer at the end of a scene. */
-export function holdSeconds(audioSec, isSceneEnd) {
-  return Math.round((audioSec + (isSceneEnd ? 0.7 : 0.3)) * 1000) / 1000;
+/** Seconds of silence after a cue's voice, by where the cue ends: mid-sentence, a sentence, or a scene. */
+export const PAUSE_AFTER = Object.freeze({ clause: 0.6, sentence: 1.1, scene: 2.0 });
+
+/** Seconds a cue stays on screen: its audio plus the pause for where it ends. */
+export function holdSeconds(audioSec, pause) {
+  if (!Object.hasOwn(PAUSE_AFTER, pause)) throw new Error(`unknown pause '${pause}', expected one of ${Object.keys(PAUSE_AFTER).join(', ')}`);
+  return Math.round((audioSec + PAUSE_AFTER[pause]) * 1000) / 1000;
 }

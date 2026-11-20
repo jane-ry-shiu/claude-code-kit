@@ -9,7 +9,6 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { loadScenes, buildCues } from './lib/scenes.mjs';
-import { spokenText } from './lib/cues.mjs';
 import { voiceCue, durationOf, chooseVoice, describeVoice, isAzureVoice } from './lib/voice.mjs';
 import { azureCredentials } from './lib/azure-voice.mjs';
 import { holdSeconds } from './lib/guard.mjs';
@@ -130,8 +129,8 @@ export async function makeVideo(scenePath, outDir, { voice: voiceOverride } = {}
   const cues = buildCues(sf);
   for (const [i, c] of cues.entries()) {
     c.wav = join(voiceDir, `c${String(i).padStart(3, '0')}.wav`);
-    c.dur = await voiceCue(spokenText(c.text), c.wav, voice, { azure, cacheDir: join(voiceDir, 'cache') });
-    c.hold = holdSeconds(c.dur, i === cues.length - 1 || cues[i + 1].scene !== c.scene);
+    c.dur = await voiceCue(c.spoken, c.wav, voice, { azure, cacheDir: join(voiceDir, 'cache') });
+    c.hold = holdSeconds(c.dur, c.pause);
   }
 
   const result = await recordWithHarness(sf, cues, out);

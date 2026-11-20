@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { splitCues, textWidth, spokenText } from '../lib/cues.mjs';
+import { splitCues, splitCueParts, textWidth } from '../lib/cues.mjs';
 
 const strip = (s) => s.replace(/[，、；：。！？\s\n]/g, '');
 const lines = (cue) => cue.split('\n');
@@ -45,6 +45,21 @@ test('an empty or punctuation-only sentence throws', () => {
   assert.throws(() => splitCues('  。 '), /empty/);
 });
 
-test('spokenText joins lines with a space', () => {
-  assert.equal(spokenText('第一行\n第二行'), '第一行 第二行');
+test('the voice keeps the punctuation the caption drops at a line break', () => {
+  const s = 'Backstage 的首頁就是 Catalog，公司的服務、API 和基礎設施，都登記在這裡。';
+  const parts = splitCueParts(s);
+  assert.equal(parts.length, 1);
+  assert.equal(parts[0].text, splitCues(s)[0]);
+  assert.equal(parts[0].spoken, s);
+});
+
+test('a single-line cue is spoken with its punctuation', () => {
+  assert.deepEqual(splitCueParts('這裡改成 API。'), [{ text: '這裡改成 API', spoken: '這裡改成 API。' }]);
+});
+
+test('a line break at a space between words stays a space in the voice', () => {
+  const s = '請打開 Shipping Backend API Specification Document Viewer Page 看看';
+  const [first] = splitCueParts(s, 12);
+  assert.equal(first.text, '請打開 Shipping Backend\nAPI Specification');
+  assert.equal(first.spoken, '請打開 Shipping Backend API Specification');
 });

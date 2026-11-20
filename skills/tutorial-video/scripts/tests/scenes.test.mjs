@@ -46,9 +46,20 @@ test('buildCues attaches a sentence action to its first cue only', () => {
   assert.ok(first.length >= 2);
   assert.equal(first[0].action, act.toString());
   assert.ok(first.slice(1).every((c) => c.action === undefined));
-  assert.deepEqual(cues.at(-1), { scene: 0, sentence: 1, text: '下一句' });
+  assert.deepEqual(cues.at(-1), { scene: 0, sentence: 1, text: '下一句', spoken: '下一句。', pause: 'scene' });
 });
 
+test('buildCues pauses briefly inside a sentence, longer after it, longest at a scene end', () => {
+  const long = '點進 Shipping Backend API 之後，About 卡片會告訴你它屬於哪個系統，由哪個團隊負責，往下捲還可以看到誰提供這支 API，又有誰在使用它。';
+  const cues = buildCues({ scenes: [
+    { title: 'a', sentences: [{ say: long }, { say: '第二句。' }] },
+    { title: 'b', sentences: [{ say: '最後一句。' }] },
+  ] });
+  const first = cues.filter((c) => c.scene === 0 && c.sentence === 0);
+  assert.ok(first.slice(0, -1).every((c) => c.pause === 'clause'));
+  assert.equal(first.at(-1).pause, 'sentence');
+  assert.deepEqual(cues.filter((c) => c.pause === 'scene').map((c) => c.text), ['第二句', '最後一句']);
+});
 
 test('an action that writes its own subtitle is rejected before recording', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'tv-scenes-'));

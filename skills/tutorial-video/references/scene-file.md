@@ -13,7 +13,7 @@ An ES module whose default export describes one video. `make-video.mjs` checks i
 | `site.secretPatterns` | no | extra regex sources to mask |
 | `start` | no | path opened before recording starts (default `/`) |
 | `viewport`, `scale` | no | default `1600x900`, `1.2` (a 1920×1080 video) |
-| `voice` | no | `{ engine: 'azure', name: 'zh-TW-HsiaoChenNeural', rate?: '+10%' }` (needs a key, see SKILL.md), or `{ command: [...] }` with `{text}` and `{out}` placeholders; default `say -v Meijia -r 185 -o {out}.aiff {text}`. `--voice mac` on the command line overrides it |
+| `voice` | no | `{ engine: 'azure', name: 'zh-TW-HsiaoChenNeural', rate?: '+10%' }` (needs a key, see SKILL.md), or `{ command: [...] }` with `{text}` and `{out}` placeholders; default `say -v Meijia -r 200 -o {out}.aiff {text}`. `--voice mac` on the command line overrides it |
 | `scenes[].title` | yes | for your own reading; not shown |
 | `scenes[].sentences[].say` | yes | what is spoken and shown as subtitle(s) |
 | `scenes[].sentences[].do` | no | `async (page, h) => { … }` run while the sentence's first cue is spoken |

@@ -15,9 +15,14 @@ test('isAllowedRequest lets reads through and blocks everything else', () => {
   assert.equal(isAllowedRequest('PUT', '/api/catalog/entities/by-refs', ['^/api/catalog/entities/by-refs']), false);
 });
 
-test('holdSeconds adds the gap after a cue', () => {
-  assert.equal(holdSeconds(5, false), 5.3);
-  assert.equal(holdSeconds(5, true), 5.7);
+test('holdSeconds adds a pause that grows from mid-sentence to sentence end to scene end', () => {
+  assert.equal(holdSeconds(5, 'clause'), 5.6);
+  assert.equal(holdSeconds(5, 'sentence'), 6.1);
+  assert.equal(holdSeconds(5, 'scene'), 7);
+});
+
+test('holdSeconds rejects an unknown pause', () => {
+  assert.throws(() => holdSeconds(5, 'paragraph'), /pause/);
 });
 
 const site = { baseUrl: 'https://x.example.com', cookieHost: 'x.example.com', cookieSource: 'http://127.0.0.1:9222', allowPost: ['^/api/read'], secretPatterns: [] };
