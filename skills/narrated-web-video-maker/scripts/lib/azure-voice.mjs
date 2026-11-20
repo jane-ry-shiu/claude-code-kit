@@ -97,7 +97,7 @@ export async function azureSynthesize(text, voice, creds, { sleep = (ms) => new 
       'Ocp-Apim-Subscription-Key': creds.key,
       'Content-Type': 'application/ssml+xml',
       'X-Microsoft-OutputFormat': 'riff-48khz-16bit-mono-pcm',
-      'User-Agent': 'tutorial-video',
+      'User-Agent': 'narrated-web-video-maker',
     },
     body: azureSsml(text, voice),
   };

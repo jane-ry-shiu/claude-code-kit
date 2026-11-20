@@ -67,7 +67,7 @@ How each consumer gets them:
 |---|---|
 | stdio MCP servers that need a token (e.g. in a company pack) | started through `bin/kit-env`, which loads the Keychain values into that process only |
 | GitHub MCP server | `headersHelper` → `bin/kit-github-headers`; uses `GITHUB_PAT` if set, otherwise your `gh auth login` session (no PAT needed) |
-| tutorial-video's Azure voice | `AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION`: environment first, then `kit-secret get` directly, so no `~/.zshrc` line is needed |
+| narrated-web-video-maker's Azure voice | `AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION`: environment first, then `kit-secret get` directly, so no `~/.zshrc` line is needed |
 | Skill scripts that need a token | read it from the environment — add `eval "$(~/claude-code-kit/bin/kit-secret env)"` to `~/.zshrc` |
 | Teams notifications | `skills/teams-notify/references/targets.json` — git-ignored; the teams-notify skill creates it when you add a target |
 

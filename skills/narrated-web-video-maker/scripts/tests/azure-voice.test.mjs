@@ -82,7 +82,7 @@ test('azureSynthesize posts SSML with the key and output format and returns the 
     assert.equal(r.headers['ocp-apim-subscription-key'], KEY);
     assert.equal(r.headers['content-type'], 'application/ssml+xml');
     assert.equal(r.headers['x-microsoft-outputformat'], 'riff-48khz-16bit-mono-pcm');
-    assert.equal(r.headers['user-agent'], 'tutorial-video');
+    assert.equal(r.headers['user-agent'], 'narrated-web-video-maker');
     assert.match(r.body, /<voice name='zh-TW-HsiaoChenNeural'>你好<\/voice>/);
   } finally { fake.server.close(); }
 });

@@ -1,9 +1,9 @@
 ---
-name: tutorial-video
-description: Use when someone wants a narrated tutorial or demo video of a web app — 教學影片, 操作示範影片, a walkthrough with voice-over and subtitles, onboarding video for colleagues — recorded from the real site. Not for verification evidence or bug-reproduction recordings attached to Jira or a PR; those stay with os-screen-capture.
+name: narrated-web-video-maker
+description: Use when someone wants a video with voice-over and subtitles recorded from a real web app — 教學影片, 操作示範影片, 功能介紹影片, a demo or walkthrough, onboarding video for colleagues. Makes the video from an approved narration script; writing that script well is outside this skill. Not for verification evidence or bug-reproduction recordings attached to Jira or a PR; those stay with os-screen-capture.
 ---
 
-# Tutorial Video
+# Narrated Web Video Maker
 
 ## Overview
 
