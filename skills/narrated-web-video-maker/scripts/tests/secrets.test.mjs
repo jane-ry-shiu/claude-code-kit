@@ -68,3 +68,21 @@ test('the browser init script masks text when run against a document', () => {
   assert.equal(nodes[1].nodeValue, 'Shipping Team');
   assert.equal(inputs[0].value, PLACEHOLDER);
 });
+
+test('the browser init script leaves script and style text alone', () => {
+  const secret = 'token: 9f8e7d6c5b4a39281706f5e4d3c2b1a0';
+  const nodes = ['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'P'].map((tag) => ({ nodeValue: secret, parentNode: { nodeName: tag } }));
+  const sandbox = {
+    NodeFilter: { SHOW_TEXT: 4 },
+    MutationObserver: class { observe() {} },
+    document: {
+      body: {},
+      readyState: 'complete',
+      addEventListener() {},
+      createTreeWalker: () => { let i = -1; return { nextNode: () => (++i < nodes.length ? nodes[i] : null) }; },
+      querySelectorAll: () => [],
+    },
+  };
+  vm.runInNewContext(maskInitScript(), sandbox);
+  assert.deepEqual(nodes.map((n) => n.nodeValue), [secret, secret, secret, secret, `token: ${PLACEHOLDER}`]);
+});

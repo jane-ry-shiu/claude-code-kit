@@ -69,7 +69,8 @@ export function maskInitScript(extra = []) {
   return `(() => {
   const scan = ${scanSecrets.toString()};
   const extra = ${JSON.stringify(extra)};
-  const fixText = (n) => { const v = n.nodeValue; if (!v) return; const m = scan(v, extra, 'mask'); if (m !== v) n.nodeValue = m; };
+  const hidden = /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE)$/;
+  const fixText = (n) => { const v = n.nodeValue; if (!v || (n.parentNode && hidden.test(n.parentNode.nodeName))) return; const m = scan(v, extra, 'mask'); if (m !== v) n.nodeValue = m; };
   const fixTree = (root) => {
     if (!root) return;
     if (root.nodeType === 3) { fixText(root); return; }
