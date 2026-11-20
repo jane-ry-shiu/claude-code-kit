@@ -1,6 +1,6 @@
 ---
 name: narrated-web-video-maker
-description: Use when someone wants a video with voice-over and subtitles recorded from a real web app — 教學影片, 操作示範影片, 功能介紹影片, a demo or walkthrough, onboarding video for colleagues. Makes the video from an approved narration script; writing that script well is outside this skill. Not for verification evidence or bug-reproduction recordings attached to Jira or a PR; those stay with os-screen-capture.
+description: Use when someone wants a video with voice-over and subtitles recorded from a real web app — 教學影片, 操作示範影片, 功能介紹影片, a demo or walkthrough, onboarding video for colleagues. Makes the video from an approved narration script; writing that script is narration-script-writer's job. Not for verification evidence or bug-reproduction recordings attached to Jira or a PR; those stay with os-screen-capture.
 ---
 
 # Narrated Web Video Maker
@@ -25,9 +25,9 @@ directory whose `node_modules` has `playwright-core` — any project checkout wi
 
 ## Procedure
 
-1. **Draft the script, get it approved.** Write scenes as plain text: scene title, the sentences to be spoken, and what
-   the screen shows during each. Send it to the person who asked for the video and wait for approval. Do not record an
-   unapproved script. Length: one sentence takes about 6 s, so a 1-minute video is about 10 sentences.
+1. **Get an approved script.** `narration-script-writer` writes it (scenes, numbered sentences, the screen action of
+   each) and ends with the requester's approval. Do not record an unapproved script. One sentence takes about 6 s, so
+   a 1-minute video is about 10 sentences.
 2. **Write the scene file** (shape and an example: [references/scene-file.md](references/scene-file.md)). One sentence =
    what is said + the action done while it is said. Only read-only actions: no Submit, Save, Delete, Register, Sign
    out, theme or settings changes.
