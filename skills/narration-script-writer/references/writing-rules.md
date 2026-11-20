@@ -14,6 +14,8 @@ requester marked.
 | Name a thing by what it is and what the viewer does with it. A label the viewer has to decode (portal, endpoint, node, domain) is replaced or explained once. | 這支影片帶你認識 Backstage，公司內部的開發者入口。 | 這支影片介紹 Backstage。它是公司內部的一個網站，專門用來查各個服務的資料。 |
 | Start with the thing on screen or being talked about, then say what it is. | 首頁就是 Catalog。 | Catalog 是 Backstage 的首頁。 |
 | Every sentence tells the viewer something they could not guess. Give the real scope instead of a bare 所有 or 相關. | 點左邊的 APIs，可以瀏覽所有 API。 | 點左邊的 APIs，可以瀏覽所有已經登記在 Backstage 上的 API。 |
+| A page the viewer has not used before gets what it is for, who reads or uses it, and what is in it, each with a real example from the screen. | Docs 收錄各個服務的技術文件，文件跟程式碼放在一起，所以會跟著程式碼一起更新。 | Docs 是放技術文件的地方，每份文件都屬於一個服務。／文件是寫給要修改或串接這個服務的人看，例如前端要串接後端的 API 之前，可以先來這裡看。／清單列出已經寫好文件的服務，例如 Shipping Backend 和 Billing Portal。／這份文件說明這個服務在做什麼，還有怎麼在自己的電腦上跑起來。 |
+| An operation that takes a choice or an input names one real value the viewer sees happen. | 左邊的 Kind 用來切換要看哪一類，預設的 Component，指的是服務、網站和共用套件。 | 左邊的 Kind 用來切換要看哪一類，例如選 API，清單就只剩下 API。／預設的 Component，指的是服務、網站和共用套件。 |
 | Put the real verb in front; 進行 in front of a verb adds words and no meaning. (進行 meaning "in progress" is fine: 進行中.) | 點 Save 進行儲存。 | 點 Save 儲存。 |
 | No filler. 嗯, 痾, 呃 never belong (the checker flags them); 那個 is filler only when it carries no reference. | 那個，我們來看一下這頁。 | 這一頁是服務的詳細資料。 |
 | Say what a technical detail means to the viewer. | 每個 endpoint 都可以展開，看請求和回應的格式。 | 每一支 API 都能展開，看要送什麼資料、會拿回什麼。 |

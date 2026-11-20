@@ -17,11 +17,13 @@ For every sentence you would change, write one line:
 N | reason | plainer rewrite
 
 The reason is one of: hard to follow on one hearing; a label the audience has to decode; unnatural word order; says
-nothing the audience could not guess, or no real scope; filler (那個 with no reference, 進行 padding a verb); English
-not written the way it is said; too long for one subtitle; the screen action submits, saves or deletes.
+nothing the audience could not guess, or no real scope; a new page or an operation with no real example; filler
+(那個 with no reference, 進行 padding a verb); English not written the way it is said; too long for one subtitle;
+the screen action submits, saves or deletes.
 
-The rewrite keeps the sentence's facts and changes only how it is said. List sentences in script order. If nothing
-needs changing, reply exactly: nothing to flag
+The rewrite keeps the sentence's facts and changes only how it is said. When the reason is a missing example, you
+cannot know the real value: write `needs an example of <what>` instead of a rewrite. List sentences in script order.
+If nothing needs changing, reply exactly: nothing to flag
 
 Script:
 {script}

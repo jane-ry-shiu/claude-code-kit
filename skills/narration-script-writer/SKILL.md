@@ -29,7 +29,8 @@ script goes to the video maker.
 2. **Research.** Make every point true and showable:
    - read the sources behind each point (repository files, docs, configuration);
    - open every page the video will show in the shared Chrome (see browser-lanes), read-only; note exact labels and
-     what is on screen;
+     what is on screen, including real values to use as examples (an entry in a list, a keyword that finds
+     something, the sections of a document);
    - decide how each point is shown:
 
    | The point lives in | On screen |
