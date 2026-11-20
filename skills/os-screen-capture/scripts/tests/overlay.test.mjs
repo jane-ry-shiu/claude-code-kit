@@ -6,7 +6,7 @@ class FakeCtx {
   constructor() { this.calls = []; this.font = ''; }
   measureText(t) { const px = parseFloat(this.font.match(/(\d+(\.\d+)?)px/)[1]); return { width: [...t].length * px }; }
   roundRect(...a) { this.calls.push(['roundRect', ...a]); }
-  fillText(...a) { this.calls.push(['fillText', ...a]); }
+  fillText(t, x, y) { this.calls.push(['fillText', t, x, y, this.textAlign]); }
   beginPath() {} arc() {} fill() {} stroke() {} drawImage() {}
 }
 let ctx;
@@ -22,13 +22,13 @@ const run = async (labels) => {
   return { boxes: ctx.calls.filter((c) => c[0] === 'roundRect'), texts: ctx.calls.filter((c) => c[0] === 'fillText') };
 };
 
-test('a single-line caption draws exactly as before', async () => {
+test('a single-line caption draws its text centred in the same box as before', async () => {
   const text = '單行字幕';
   const { boxes, texts } = await run([{ kind: 'mark', text }]);
   const tw = [...text].length * LABEL.size * sc, padX = LABEL.padX * sc, hgt = LABEL.height * sc;
   const top = H - hgt - LABEL.bottom * sc, left = (W - tw) / 2 - padX;
   assert.deepEqual(boxes, [['roundRect', left, top, tw + 2 * padX, hgt, 8 * sc]]);
-  assert.deepEqual(texts, [['fillText', text, left + padX, top + hgt / 2]]);
+  assert.deepEqual(texts, [['fillText', text, W / 2, top + hgt / 2, 'center']]);
 });
 
 test('a caption with a line break draws one box with one line per segment', async () => {
@@ -39,6 +39,15 @@ test('a caption with a line break draws one box with one line per segment', asyn
   const [, , top, , hgt] = boxes[0];
   assert.ok(Math.abs(top + hgt - (H - LABEL.bottom * sc)) < 1e-6, 'box bottom stays where a one-line box ends');
   assert.ok(Math.abs(boxes[0][3] - ([...'B行很長一點'].length * LABEL.size * sc + 2 * LABEL.padX * sc)) < 1e-6, 'width follows the widest line');
+});
+
+test('every line of a multi-line caption is centred on the box', async () => {
+  const { boxes, texts } = await run([{ kind: 'mark', text: '短\n這一行比較長很多' }]);
+  const [, left, , width] = boxes[0];
+  for (const t of texts) {
+    assert.equal(t[4], 'center', t[1]);
+    assert.ok(Math.abs(t[2] - (left + width / 2)) < 1e-6, t[1]);
+  }
 });
 
 test('a key label sits above a multi-line caption', async () => {
