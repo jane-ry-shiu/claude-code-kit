@@ -54,7 +54,7 @@ directory whose `node_modules` has `playwright-core` — any project checkout wi
 ## Signing in
 
 `site.cookieSource` copies the site's cookies from the shared Chrome (`http://127.0.0.1:9222`, see browser-lanes)
-into a throwaway profile that is deleted when the run ends, also on failure. The agent never types a password. When
+into a throwaway profile that is deleted when the run ends, also on failure. A video that also opens another signed-in site (GitHub next to the portal) lists it in `site.alsoSignIn`. The agent never types a password. When
 the run fails with `no session for <host>: sign in …`, ask the owner to sign in to that site in the shared Chrome,
 then rerun. Sites without sign-in leave `cookieSource` out.
 
@@ -104,4 +104,5 @@ whose purpose is to display a secret (token or key management) unless the owner 
 | A subtitle runs long or splits oddly | Shorten the sentence or add a comma where the break should go |
 | Voice and pointer out of step | The action is in the wrong sentence; move it |
 | `guardLog` lists a POST the page needs to show data | It is a read endpoint: add its path pattern to `site.allowPost`, then rerun |
+| A folder in GitHub's left file tree changes the address but never opens | The tree loads folders with `POST /<owner>/<repo>/_file_tree`, a read: add `'^/<owner>/<repo>/_file_tree$'` to `site.allowPost` |
 | The page shows an error toast in the video | A needed read was blocked (see above) or the session expired (sign in again) |

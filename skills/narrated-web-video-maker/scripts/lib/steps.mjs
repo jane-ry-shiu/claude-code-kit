@@ -3,35 +3,50 @@
 import { isAllowedRequest } from './guard.mjs';
 import { maskInitScript, scanSecrets } from './secrets.mjs';
 
-/** Step that signs the headless browser in (cookies from the shared Chrome), guards writes and installs masking. */
+/**
+ * Step that signs the headless browser in (cookies from the shared Chrome), guards writes and installs masking.
+ * Writes are guarded per page through the browser's own interception, limited to the guarded hosts: a Playwright
+ * route would pause every request and turn the HTTP cache off, which made signed-in GitHub pages load in 7-9 s.
+ */
 export function setupStepSource(site) {
   const base = new URL(site.baseUrl);
-  const host = site.cookieHost || base.hostname;
-  const guardHosts = [base.host, ...(site.guardHosts || [])];
+  const signIns = [
+    { host: site.cookieHost || base.hostname, url: site.baseUrl },
+    ...(site.alsoSignIn || []).map((url) => ({ host: new URL(url).hostname, url })),
+  ];
+  const guardHosts = [base.host, ...(site.alsoSignIn || []).map((url) => new URL(url).host), ...(site.guardHosts || [])];
   return `async (page, context, h) => {
-  const site = ${JSON.stringify({ ...site, host, guardHosts })};
+  const site = ${JSON.stringify({ ...site, signIns, guardHosts })};
   const allowed = ${isAllowedRequest.toString()};
   let n = 0;
   if (site.cookieSource) {
-    const need = 'no session for ' + site.host + ': sign in to ' + site.baseUrl + ' in the shared Chrome';
+    const need = (s) => 'no session for ' + s.host + ': sign in to ' + s.url + ' in the shared Chrome';
     let all;
     try {
       const shared = await chromium.connectOverCDP(site.cookieSource);
       all = await shared.contexts()[0].cookies();
-    } catch (e) { throw new Error(need + ' (' + e.message + ')'); }
-    const mine = all.filter((c) => { const d = c.domain.replace(/^\\./, ''); return site.host === d || site.host.endsWith('.' + d); });
-    if (!mine.length) throw new Error(need);
-    await context.addCookies(mine);
-    n = mine.length;
+    } catch (e) { throw new Error(need(site.signIns[0]) + ' (' + e.message + ')'); }
+    for (const s of site.signIns) {
+      const mine = all.filter((c) => { const d = c.domain.replace(/^\\./, ''); return s.host === d || s.host.endsWith('.' + d); });
+      if (!mine.length) throw new Error(need(s));
+      await context.addCookies(mine);
+      n += mine.length;
+    }
   }
   h.state.guardLog = [];
-  await context.route((u) => site.guardHosts.includes(u.host), async (route) => {
-    const r = route.request();
-    const path = new URL(r.url()).pathname;
-    if (allowed(r.method(), path, site.allowPost || [])) return route.continue();
-    h.state.guardLog.push(r.method() + ' ' + path);
-    return route.abort();
-  });
+  const patterns = site.guardHosts.flatMap((g) => [{ urlPattern: 'http://' + g + '/*' }, { urlPattern: 'https://' + g + '/*' }]);
+  const guard = async (p) => {
+    const cdp = await context.newCDPSession(p);
+    cdp.on('Fetch.requestPaused', async (e) => {
+      const path = new URL(e.request.url).pathname;
+      if (allowed(e.request.method, path, site.allowPost || [])) return cdp.send('Fetch.continueRequest', { requestId: e.requestId }).catch(() => null);
+      h.state.guardLog.push(e.request.method + ' ' + path);
+      return cdp.send('Fetch.failRequest', { requestId: e.requestId, errorReason: 'BlockedByClient' }).catch(() => null);
+    });
+    await cdp.send('Fetch.enable', { patterns });
+  };
+  for (const p of context.pages()) await guard(p);
+  context.on('page', (p) => { guard(p).catch(() => null); });
   await context.addInitScript(${JSON.stringify(maskInitScript(site.secretPatterns || []))});
   return { cookies: n, guardHosts: site.guardHosts };
 }`;

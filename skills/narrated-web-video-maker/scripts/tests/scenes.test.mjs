@@ -86,3 +86,11 @@ test('a voice that is neither azure nor a command is rejected', async () => {
   await assert.rejects(loadScenes(writeScene(`{ engine: 'azure', name: 'zh-TW-HsiaoChenNeural', rate: 10 }`)), /voice\.rate must be a string/);
   await assert.rejects(loadScenes(writeScene(`{ command: ['say', 'hi'] }`)), /voice\.command must be an array of strings that writes to \{out\}/);
 });
+
+test('alsoSignIn must be a list of site URLs', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'tv-scenes-'));
+  const file = join(dir, 'signin.scenes.mjs');
+  writeFileSync(file, `export default { name: 'signin', site: { baseUrl: 'http://x', alsoSignIn: ['github.com'] },
+    scenes: [{ title: 't', sentences: [{ say: 'ok' }] }] };`);
+  await assert.rejects(loadScenes(file), /site\.alsoSignIn must be a list of site URLs \(https:\/\/host\)/);
+});

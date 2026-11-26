@@ -28,12 +28,29 @@ test('holdSeconds rejects an unknown pause', () => {
 const site = { baseUrl: 'https://x.example.com', cookieHost: 'x.example.com', cookieSource: 'http://127.0.0.1:9222', allowPost: ['^/api/read'], secretPatterns: [] };
 
 const fakeChromium = (cookies) => ({ connectOverCDP: async () => ({ contexts: () => [{ cookies: async () => cookies }] }) });
+const fakeSession = () => {
+  const s = { sent: [], handlers: {} };
+  s.send = async (method, params) => { s.sent.push({ method, params }); };
+  s.on = (event, fn) => { s.handlers[event] = fn; };
+  return s;
+};
 const fakeContext = () => {
-  const c = { cookies: [], routes: [], scripts: [] };
+  const c = { cookies: [], routes: [], scripts: [], sessions: [], openPage: null, page: { id: 'first' } };
   c.addCookies = async (ck) => { c.cookies.push(...ck); };
   c.route = async (match, handler) => { c.routes.push({ match, handler }); };
   c.addInitScript = async (s) => { c.scripts.push(s); };
+  c.pages = () => [c.page];
+  c.newCDPSession = async (page) => { const s = fakeSession(); s.page = page; c.sessions.push(s); return s; };
+  c.on = (event, fn) => { if (event === 'page') c.openPage = fn; };
   return c;
+};
+const globToRegExp = (g) => new RegExp('^' + g.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$');
+const interceptPatterns = (session) => session.sent.find((m) => m.method === 'Fetch.enable').params.patterns.map((p) => p.urlPattern);
+const intercepts = (session, url) => interceptPatterns(session).some((g) => globToRegExp(g).test(url));
+const pause = async (session, method, url) => {
+  const before = session.sent.length;
+  await session.handlers['Fetch.requestPaused']({ requestId: 'r1', request: { method, url } });
+  return session.sent.slice(before).map((m) => m.method);
 };
 
 test('setup step copies only the site cookies, guards writes and installs masking', async () => {
@@ -46,20 +63,12 @@ test('setup step copies only the site cookies, guards writes and installs maskin
   assert.deepEqual(plain(out), { cookies: 1, guardHosts: ['x.example.com'] });
   assert.deepEqual(context.cookies.map((c) => c.name), ['a']);
   assert.equal(context.scripts.length, 1);
-  const { match, handler } = context.routes[0];
-  assert.equal(match(new URL('https://x.example.com/api/z')), true);
-  assert.equal(match(new URL('https://other.com/api/z')), false);
-  const routeFor = (method, path) => {
-    const r = { done: '' };
-    r.request = () => ({ method: () => method, url: () => `https://x.example.com${path}` });
-    r.abort = async () => { r.done = 'abort'; };
-    r.continue = async () => { r.done = 'continue'; };
-    return r;
-  };
-  const del = routeFor('DELETE', '/api/thing'); await handler(del);
-  const get = routeFor('GET', '/api/thing'); await handler(get);
-  const post = routeFor('POST', '/api/read/1'); await handler(post);
-  assert.deepEqual([del.done, get.done, post.done], ['abort', 'continue', 'continue']);
+  const [session] = context.sessions;
+  assert.equal(intercepts(session, 'https://x.example.com/api/z'), true);
+  assert.equal(intercepts(session, 'https://other.com/api/z'), false);
+  assert.deepEqual(await pause(session, 'DELETE', 'https://x.example.com/api/thing'), ['Fetch.failRequest']);
+  assert.deepEqual(await pause(session, 'GET', 'https://x.example.com/api/thing'), ['Fetch.continueRequest']);
+  assert.deepEqual(await pause(session, 'POST', 'https://x.example.com/api/read/1'), ['Fetch.continueRequest']);
   assert.deepEqual(plain(h.state.guardLog), ['DELETE /api/thing']);
 });
 
@@ -67,7 +76,7 @@ const setupWith = async (siteCfg, cookies) => {
   const step = vm.runInNewContext(`(${setupStepSource(siteCfg)})`, { chromium: fakeChromium(cookies), URL });
   const context = fakeContext();
   const out = await step({}, context, { state: {} });
-  return { out: plain(out), context, guarded: (url) => context.routes[0].match(new URL(url)) };
+  return { out: plain(out), context, guarded: (url) => intercepts(context.sessions[0], url) };
 };
 
 test('setup step copies session cookies set on a parent domain', async () => {
@@ -93,9 +102,45 @@ test('setup step guards extra API hosts and reports every guarded host', async (
   assert.deepEqual(out.guardHosts, ['x.example.com', 'api.example.net']);
 });
 
+test('setup step keeps the browser cache by intercepting only the guarded hosts', async () => {
+  const { context, guarded } = await setupWith(site, [{ domain: 'x.example.com', name: 'a' }]);
+  assert.equal(context.routes.length, 0);
+  assert.equal(context.sessions[0].sent.some((m) => m.method === 'Network.setCacheDisabled'), false);
+  assert.equal(guarded('https://x.example.com.evil.net/a'), false);
+  assert.equal(guarded('https://assets.example.com/app.js'), false);
+});
+
+test('setup step guards pages opened after it ran', async () => {
+  const { context } = await setupWith(site, [{ domain: 'x.example.com', name: 'a' }]);
+  await context.openPage({ id: 'later' });
+  await new Promise((r) => setImmediate(r));
+  const later = context.sessions.find((s) => s.page.id === 'later');
+  assert.ok(later, 'no guard on the later page');
+  assert.equal(intercepts(later, 'https://x.example.com/api/z'), true);
+  assert.deepEqual(await pause(later, 'PUT', 'https://x.example.com/api/z'), ['Fetch.failRequest']);
+});
+
 test('setup step fails before recording when there is no session', async () => {
   const step = vm.runInNewContext(`(${setupStepSource(site)})`, { chromium: fakeChromium([]), URL });
   await assert.rejects(step({}, fakeContext(), { state: {} }), /sign in to https:\/\/x\.example\.com in the shared Chrome/);
+});
+
+test('setup step also signs in to every alsoSignIn site and guards its writes', async () => {
+  const { out, context, guarded } = await setupWith(
+    { ...site, alsoSignIn: ['https://code.example.org'] },
+    [{ domain: 'x.example.com', name: 'a' }, { domain: '.code.example.org', name: 'gh' }, { domain: 'other.com', name: 'b' }],
+  );
+  assert.deepEqual(context.cookies.map((c) => c.name), ['a', 'gh']);
+  assert.equal(out.cookies, 2);
+  assert.equal(guarded('https://code.example.org/api/write'), true);
+  assert.deepEqual(out.guardHosts, ['x.example.com', 'code.example.org']);
+});
+
+test('setup step names the alsoSignIn site that has no session', async () => {
+  const step = vm.runInNewContext(`(${setupStepSource({ ...site, alsoSignIn: ['https://code.example.org'] })})`, {
+    chromium: fakeChromium([{ domain: 'x.example.com', name: 'a' }]), URL,
+  });
+  await assert.rejects(step({}, fakeContext(), { state: {} }), /no session for code\.example\.org: sign in to https:\/\/code\.example\.org in the shared Chrome/);
 });
 
 test('setup step without a cookie source skips sign-in', async () => {

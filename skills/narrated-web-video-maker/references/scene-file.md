@@ -8,6 +8,7 @@ An ES module whose default export describes one video. `make-video.mjs` checks i
 | `site.baseUrl` | yes | origin of the site, e.g. `https://portal.example.com` |
 | `site.cookieSource` | no | CDP URL of the signed-in shared Chrome (`http://127.0.0.1:9222`); leave out for public sites |
 | `site.cookieHost` | no | host whose sign-in cookies are copied (cookies set on it or on a parent domain, e.g. `.example.com`); default: host name of `baseUrl` |
+| `site.alsoSignIn` | no | other sites the video opens that need sign-in, as origins (`['https://github.com']`); their cookies are copied from the shared Chrome too and their writes are blocked like the main site's |
 | `site.guardHosts` | no | extra hosts (`host` or `host:port`) whose writes are blocked, e.g. an API on another host; the host of `baseUrl` is always guarded |
 | `site.allowPost` | no | regex sources of POST paths that only read (search, batch lookups); every other non-GET is blocked |
 | `site.secretPatterns` | no | extra regex sources to mask |

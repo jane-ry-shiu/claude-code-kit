@@ -27,6 +27,10 @@ function problemsOf(sf) {
   if (!sf || typeof sf !== 'object') return ['the file must `export default` a scene object'];
   if (!/^[a-z0-9][a-z0-9-]*$/.test(sf.name || '')) p.push('name is missing or not lower-case-with-dashes');
   if (!sf.site?.baseUrl) p.push('site.baseUrl is missing');
+  const also = sf.site?.alsoSignIn;
+  if (also !== undefined && !(Array.isArray(also) && also.every((u) => /^https?:\/\/[^/\s]+\/?$/.test(u)))) {
+    p.push('site.alsoSignIn must be a list of site URLs (https://host)');
+  }
   if (!Array.isArray(sf.scenes) || !sf.scenes.length) p.push('no scenes');
   p.push(...voiceProblems(sf.voice));
   (sf.scenes || []).forEach((scene, i) => {
