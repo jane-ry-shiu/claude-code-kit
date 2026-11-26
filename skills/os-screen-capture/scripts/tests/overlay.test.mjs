@@ -56,3 +56,21 @@ test('a key label sits above a multi-line caption', async () => {
   assert.ok(cap[4] > LABEL.height * sc, 'caption box is taller than one line');
   assert.ok(key[2] + key[4] <= cap[2] - LABEL.gap * sc + 1e-6);
 });
+
+test('a caption marked top sits the same distance from the top edge', async () => {
+  const { boxes } = await run([{ kind: 'mark', text: '第一行\n第二行', at: 'top' }]);
+  assert.ok(Math.abs(boxes[0][2] - LABEL.bottom * sc) < 1e-6);
+});
+
+test('a key label stays at the bottom when the caption is at the top', async () => {
+  const { boxes } = await run([{ kind: 'mark', text: '字幕', at: 'top' }, { kind: 'key', text: '按鍵：Escape' }]);
+  const key = boxes[1];
+  assert.ok(Math.abs(key[2] + key[4] - (H - LABEL.bottom * sc)) < 1e-6);
+});
+
+test('overlayAt passes on where a caption sits', async () => {
+  const { overlayAt } = await import('../overlay.mjs');
+  const spec = overlayAt([{ type: 'move', t: 0, x: 1, y: 1 }, { type: 'mark', t: 0, text: '上', at: 'top' }, { type: 'mark', t: 1, text: '下' }], 0.5);
+  assert.deepEqual(spec.labels, [{ kind: 'mark', text: '上', at: 'top' }]);
+  assert.deepEqual(overlayAt([{ type: 'move', t: 0, x: 1, y: 1 }, { type: 'mark', t: 0, text: '下' }], 0.5).labels, [{ kind: 'mark', text: '下', at: 'bottom' }]);
+});

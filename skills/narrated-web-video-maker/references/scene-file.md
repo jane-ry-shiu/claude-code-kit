@@ -18,6 +18,7 @@ An ES module whose default export describes one video. `make-video.mjs` checks i
 | `scenes[].title` | yes | for your own reading; not shown |
 | `scenes[].sentences[].say` | yes | what is spoken and shown as subtitle(s) |
 | `scenes[].sentences[].do` | no | `async (page, h) => { … }` run while the sentence's first cue is spoken |
+| `scenes[].sentences[].captionAt` | no | `'top'` shows this sentence's subtitles at the top edge; use it only when what the sentence points at sits at the bottom of a page that cannot scroll further (default `'bottom'`) |
 
 `do` is sent to the recorder as source text, so it cannot use variables from the scene file, and it never calls
 `h.mark` (the subtitle is the sentence's `say`; the file is rejected if it does). Inside it use:

@@ -83,7 +83,7 @@ export function installRecording(h, { context, env, OUT, run, sleep, log }) {
   };
 
   h.key = async (key, p = h.page) => { await waitGap(); await h.front(p); note({ type: 'key', text: key }); await p.keyboard.press(key); await sleep(250); done(); };
-  h.mark = (text, dur) => note({ type: 'mark', text, dur });
+  h.mark = (text, dur, { at = 'bottom' } = {}) => note({ type: 'mark', text, dur, at });
 
   h.recStart = async (name, { p = h.page, crop = 'viewport', fps = 30, kbps = 8000 } = {}) => {
     if (rec.active) throw new Error(`already recording ${rec.active.name}`);

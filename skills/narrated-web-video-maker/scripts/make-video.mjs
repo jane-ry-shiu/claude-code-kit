@@ -12,7 +12,7 @@ import { loadScenes, buildCues } from './lib/scenes.mjs';
 import { voiceCue, durationOf, chooseVoice, describeVoice, isAzureVoice } from './lib/voice.mjs';
 import { azureCredentials } from './lib/azure-voice.mjs';
 import { holdSeconds } from './lib/guard.mjs';
-import { setupStepSource, recordStepSource } from './lib/steps.mjs';
+import { setupStepSource, recordStepSource, recordCues } from './lib/steps.mjs';
 import { mixArgs, markTimes } from './lib/mix.mjs';
 import { postStep } from './lib/harness-client.mjs';
 
@@ -91,7 +91,7 @@ async function recordWithHarness(sf, cues, out) {
     console.error('recording', sf.name);
     const result = await postStep(port, recordStepSource({
       name: sf.name, baseUrl: sf.site.baseUrl, start: sf.start, secretPatterns: sf.site.secretPatterns,
-      cues: cues.map(({ scene, sentence, text, hold, action }) => ({ scene, sentence, text, hold, action })),
+      cues: recordCues(cues),
     }));
     return { ...result, guardHosts: setup.guardHosts };
   } finally {

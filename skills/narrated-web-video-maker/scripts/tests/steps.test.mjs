@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { isAllowedRequest, holdSeconds } from '../lib/guard.mjs';
-import { setupStepSource, recordStepSource } from '../lib/steps.mjs';
+import { setupStepSource, recordStepSource, recordCues } from '../lib/steps.mjs';
 
 const plain = (x) => JSON.parse(JSON.stringify(x));
 
@@ -160,7 +160,7 @@ const fakeRun = () => {
     sleep: async (ms) => log.push(['sleep', Math.round(ms / 100) / 10]),
     recStart: async (n) => log.push(['recStart', n]),
     recStop: async () => { log.push(['recStop']); return { mp4: 'v.mp4', events: [] }; },
-    mark: (t) => log.push(['mark', t]),
+    mark: (t, dur, o) => log.push(['mark', t, o && o.at]),
   };
   return { log, page, h };
 };
@@ -170,7 +170,7 @@ const plan = {
   cues: [
     { scene: 0, sentence: 0, text: '第一句\n第二行', hold: 2, action: 'async (page, h) => { h.mark("unexpected-if-run-twice"); }' },
     { scene: 0, sentence: 0, text: '第一句續', hold: 1 },
-    { scene: 1, sentence: 0, text: '第二場', hold: 1 },
+    { scene: 1, sentence: 0, text: '第二場', hold: 1, captionAt: 'top' },
   ],
 };
 
@@ -185,6 +185,14 @@ test('record step marks each cue, runs a sentence action once, holds, and scans 
   assert.deepEqual(plain(out.secretHits[0]), { scene: 0, hits: ['9f8e7d6c5b4a39281706f5e4d3c2b1a0'] });
   assert.deepEqual(plain(out.guardLog), ['DELETE /x']);
   assert.equal(out.rec.mp4, 'v.mp4');
+});
+
+test('record step puts a cue caption at the top when the cue asks for it', async () => {
+  const step = vm.runInNewContext(`(${recordStepSource(plan)})`, { Date });
+  const { log, page, h } = fakeRun();
+  await step(page, {}, h);
+  const at = Object.fromEntries(log.filter((l) => l[0] === 'mark' && l[1] !== 'unexpected-if-run-twice').map((l) => [l[1], l[2]]));
+  assert.deepEqual(at, { '第一句\n第二行': 'bottom', '第一句續': 'bottom', '第二場': 'top' });
 });
 
 test('record step waits for the start page to load, then at most 10 s for it to go quiet', async () => {
@@ -235,4 +243,15 @@ test('record step starts the next subtitle only after a slow action ends', async
   await step(page, {}, h);
   const order = log.filter((l) => l[0] === 'mark' || l[0] === 'action-done').map((l) => (l[0] === 'mark' ? l[1] : l[0]));
   assert.deepEqual(order, ['慢動作', 'action-done', '下一句']);
+});
+
+test('recordCues keeps what the recording step reads, captionAt included, and drops voice fields', () => {
+  const cues = [
+    { scene: 0, sentence: 0, text: '一', spoken: '一', hold: 2, action: 'async (page, h) => {}', wav: '/v/1.wav', dur: 1.5, pause: 'clause' },
+    { scene: 0, sentence: 1, text: '二', spoken: '二', hold: 3, captionAt: 'top', wav: '/v/2.wav', dur: 2, pause: 'scene' },
+  ];
+  assert.deepEqual(recordCues(cues), [
+    { scene: 0, sentence: 0, text: '一', hold: 2, action: 'async (page, h) => {}' },
+    { scene: 0, sentence: 1, text: '二', hold: 3, captionAt: 'top' },
+  ]);
 });

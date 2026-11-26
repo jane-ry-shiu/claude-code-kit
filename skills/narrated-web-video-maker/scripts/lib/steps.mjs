@@ -55,6 +55,15 @@ export function setupStepSource(site) {
 // Some signed-in sites (GitHub) keep one request open forever, so the start page may never go quiet.
 export const START_QUIET_MS = 10000;
 
+/** The cue fields the recording step reads; captionAt is set only on cues that move the subtitle. */
+export function recordCues(cues) {
+  return cues.map(({ scene, sentence, text, hold, action, captionAt }) => ({
+    scene, sentence, text, hold,
+    ...(action ? { action } : {}),
+    ...(captionAt ? { captionAt } : {}),
+  }));
+}
+
 /**
  * Step that records the whole video: one mark per cue, the sentence's action on its first cue, a hold until the
  * cue's time is up, and a secret scan of the page at each scene end. The recording is always stopped.
@@ -75,7 +84,7 @@ export function recordStepSource(plan) {
   try {
     for (let i = 0; i < plan.cues.length; i += 1) {
       const c = plan.cues[i];
-      h.mark(c.text);
+      h.mark(c.text, undefined, { at: c.captionAt || 'bottom' });
       const t0 = Date.now();
       if (actions[i]) {
         try { await actions[i](page, h); } catch (e) { throw new Error('scene ' + c.scene + ' sentence ' + c.sentence + ': ' + e.message); }

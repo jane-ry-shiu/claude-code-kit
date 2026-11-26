@@ -89,6 +89,7 @@ whose purpose is to display a secret (token or key management) unless the owner 
 | Write English the way it is read, split into words with capitals: `shipping backend API` not `shipping-backend-api`, `Open API` not `openapi`, `Read Me` not `README` | Subtitle = speech; the voice reads hyphens, run-together words and all-caps names oddly (owner listened: `Open API` and `Read Me` sound right) |
 | Keep the action inside the sentence that describes it | The action starts with that sentence's first cue |
 | Let long pages scroll smoothly (`page.evaluate` + `scrollTo({ behavior: 'smooth' })`) | A jump hides where the content is |
+| Keep what a sentence points at above the subtitle: scroll it up; when the page is already at its bottom, set the sentence's `captionAt: 'top'` | The subtitle covers the bottom of the frame; the viewer cannot read what is under it |
 
 ## Common mistakes
 

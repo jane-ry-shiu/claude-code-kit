@@ -6,7 +6,8 @@
 //                         so the viewer sees each result before the next action.
 //   glide(x, y, p)        move the page's pointer smoothly onto viewport point x,y (no click)
 //   key(key, p)           press a key in the page and note it on the recording
-//   mark(text, dur)       caption the recording from now until the next caption (or for `dur` seconds)
+//   mark(text, dur, o)    caption the recording from now until the next caption (or for `dur` seconds); o.at 'top'
+//                         moves it to the top edge when what it describes sits at the bottom of the page
 //   recStart(name, opts)  start a CDP screencast of the page; it keeps running across navigation and reload
 //   recStop()             stop, draw the pointer, key and caption labels -> videos/<name>.mp4
 //
@@ -72,7 +73,7 @@ export function installBackgroundRecording(h, { context, OUT, sleep, log }) {
   };
 
   h.key = async (key, p = h.page) => { await waitGap(); note({ type: 'key', text: key }); await p.keyboard.press(key); await sleep(250); done(); };
-  h.mark = (text, dur) => note({ type: 'mark', text, dur });
+  h.mark = (text, dur, { at = 'bottom' } = {}) => note({ type: 'mark', text, dur, at });
 
   h.recStart = async (name, { p = h.page, fps = 30 } = {}) => {
     if (rec.active) throw new Error(`already recording ${rec.active.name}`);

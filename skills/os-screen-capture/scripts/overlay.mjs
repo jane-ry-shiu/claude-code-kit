@@ -46,7 +46,7 @@ const labelEnd = (events, e) => {
 };
 const labelsAt = (events, t) => events
   .filter((e) => (e.type === 'key' || e.type === 'mark') && t >= e.t && t < labelEnd(events, e))
-  .map((e) => ({ kind: e.type, text: e.type === 'key' ? `${LABEL.keyPrefix}${e.text}` : e.text }));
+  .map((e) => (e.type === 'key' ? { kind: 'key', text: `${LABEL.keyPrefix}${e.text}` } : { kind: 'mark', text: e.text, at: e.at === 'top' ? 'top' : 'bottom' }));
 
 // Everything drawn at time t; equal specs draw equal overlays, so callers hold a frame while its spec repeats.
 export const overlayAt = (events, t, { motion = 'glide' } = {}) => {
@@ -76,15 +76,16 @@ export async function draw({ jpg, w, h, spec, cssW, P, RP, L }) {
   g.textBaseline = 'middle';
   g.textAlign = 'center';
   // A caption with '\n' is one box holding one line per segment, each line centred; it grows upward, and a key label
-  // sits above it.
+  // sits above it. A caption marked top hangs the same distance below the top edge instead, and the key label keeps
+  // the bottom.
   const lineH = L.size * 1.4 * sc;
   const boxH = (text) => L.height * sc + (text.split('\n').length - 1) * lineH;
   const mark = spec.labels.find((l) => l.kind !== 'key');
-  const capH = mark ? boxH(mark.text) : L.height * sc;
+  const capH = !mark ? L.height * sc + L.gap * sc : mark.at === 'top' ? 0 : boxH(mark.text) + L.gap * sc;
   for (const l of spec.labels) {
     const rows = l.text.split('\n');
     const tw = Math.max(...rows.map((r) => g.measureText(r).width)), padX = L.padX * sc, hgt = boxH(l.text);
-    const top = H - L.bottom * sc - (l.kind === 'key' ? capH + L.gap * sc + hgt : hgt), left = (W - tw) / 2 - padX;
+    const top = l.kind !== 'key' && l.at === 'top' ? L.bottom * sc : H - L.bottom * sc - (l.kind === 'key' ? capH + hgt : hgt), left = (W - tw) / 2 - padX;
     g.fillStyle = L.bg;
     g.beginPath(); g.roundRect(left, top, tw + 2 * padX, hgt, 8 * sc); g.fill();
     g.fillStyle = '#fff';

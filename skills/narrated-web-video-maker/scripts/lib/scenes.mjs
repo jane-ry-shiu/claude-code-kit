@@ -38,6 +38,7 @@ function problemsOf(sf) {
     (scene.sentences || []).forEach((s, j) => {
       const at = `scene ${i} sentence ${j}`;
       if (typeof s.say !== 'string' || !s.say.replace(/[\s，、；：。！？]/g, '')) p.push(`${at}: say is empty`);
+      if (s.captionAt !== undefined && s.captionAt !== 'top' && s.captionAt !== 'bottom') p.push(`${at}: captionAt must be 'top' or 'bottom'`);
       if (s.do === undefined) return;
       if (typeof s.do !== 'function') p.push(`${at}: do must be a function`);
       else if (!isExpression(s.do.toString())) p.push(`${at}: do must be an arrow function (async (page, h) => { ... })`);
@@ -71,6 +72,7 @@ export function buildCues(sf) {
       const isLastInSentence = k === parts.length - 1;
       const cue = { scene: i, sentence: j, text, spoken, pause: pauseAfter(isLastInSentence, isLastInSentence && j === sentences.length - 1) };
       if (k === 0 && s.do) cue.action = s.do.toString();
+      if (s.captionAt) cue.captionAt = s.captionAt;
       return cue;
     });
   }));

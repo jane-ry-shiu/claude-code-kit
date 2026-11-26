@@ -94,3 +94,17 @@ test('alsoSignIn must be a list of site URLs', async () => {
     scenes: [{ title: 't', sentences: [{ say: 'ok' }] }] };`);
   await assert.rejects(loadScenes(file), /site\.alsoSignIn must be a list of site URLs \(https:\/\/host\)/);
 });
+
+test('buildCues gives every cue of a sentence that sentence\'s caption position', () => {
+  const long = '點進 Shipping Backend API 之後，About 卡片會告訴你它屬於哪個系統，由哪個團隊負責，往下捲還可以看到誰提供這支 API，又有誰在使用它。';
+  const cues = buildCues({ scenes: [{ title: 't', sentences: [{ say: long, captionAt: 'top' }, { say: '下一句。' }] }] });
+  assert.ok(cues.filter((c) => c.sentence === 0).every((c) => c.captionAt === 'top'));
+  assert.equal(cues.at(-1).captionAt, undefined);
+});
+
+test('captionAt must be top or bottom', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'tv-scenes-'));
+  const file = join(dir, 'cap.scenes.mjs');
+  writeFileSync(file, `export default { name: 'cap', site: { baseUrl: 'http://x' }, scenes: [{ title: 't', sentences: [{ say: 'ok', captionAt: 'middle' }] }] };`);
+  await assert.rejects(loadScenes(file), /scene 0 sentence 0: captionAt must be 'top' or 'bottom'/);
+});
