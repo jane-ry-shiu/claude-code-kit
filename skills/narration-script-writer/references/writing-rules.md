@@ -29,6 +29,9 @@ requester marked.
 - Only actions that read. A step that submits, saves or deletes stops before the click:
   `12. 改完之後按下送出就可以了，這裡只是示範，所以不會真的送出。（指標停在送出按鈕上，不點）`
 - A sentence with nothing to do on screen has no brackets.
+- A file or folder is introduced where it lives: the sentence says where it is, and the action opens the folder
+  above it, scrolls the file list to it, points at it and clicks in — never a jump straight to the file.
+  `5. 它放在 repo 最外層，檔案清單往下捲就看得到，點進去打開。（往下捲檔案清單，指標停在 catalog-info.yaml，點進去）`
 
 ## Length
 

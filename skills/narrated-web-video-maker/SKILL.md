@@ -90,6 +90,7 @@ whose purpose is to display a secret (token or key management) unless the owner 
 | Keep the action inside the sentence that describes it | The action starts with that sentence's first cue |
 | Let long pages scroll smoothly (`page.evaluate` + `scrollTo({ behavior: 'smooth' })`) | A jump hides where the content is |
 | Keep what a sentence points at above the subtitle: scroll it up; when the page is already at its bottom, set the sentence's `captionAt: 'top'` | The subtitle covers the bottom of the frame; the viewer cannot read what is under it |
+| Introduce a file or folder by finding it: open the folder it lives in, scroll the file list to it, point, then click in | A file opened straight from its URL gives the viewer no idea where it is |
 
 ## Common mistakes
 
